@@ -1,7 +1,7 @@
 <?php
 if (!isConnect()) {
-    include_file('desktop', '404', 'php');
-    die();
+	include_file('desktop', '404', 'php');
+	die();
 }
 /* This file is part of Jeedom.
 *
@@ -23,14 +23,14 @@ if (!isConnect()) {
 ?>
 <legend>{{Gestion du stock}}</legend>
 <fieldset>
-    <div class="col-sm-9">
-        <div class="input-group input-group-sm">
-            <span class="input-group-btn">
-                <a class="btn btn-success listCmdAction input-group-addon roundedLeft" data-type="info">
-                    <i class="fa fa-list-alt"></i>
-                </a>
-            </span>
-            <input type="text" class="eqLogicAttr form-control CmdAction" data-l1key="configuration" data-l2key="UpStateCmd" placeholder="Sélectionner une commande" style="width: 250px">
-        </div>
-    </div>
+	<div class="col-sm-9">
+		<div class="input-group input-group-sm">
+			<span class="input-group-btn">
+				<a class="btn btn-success listCmdAction input-group-addon roundedLeft" data-type="info">
+					<i class="fa fa-list-alt"></i>
+				</a>
+			</span>
+			<input type="text" class="eqLogicAttr form-control CmdAction" data-l1key="configuration" data-l2key="UpStateCmd" placeholder="Sélectionner une commande" style="width: 250px">
+		</div>
+	</div>
 </fieldset>

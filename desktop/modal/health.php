@@ -25,15 +25,11 @@ $json=file_get_contents("http://192.168.0.21:3456/devices");
 $json = json_decode($json,true);
 
 foreach($json as $item)
-	{
-
-
-
-						$device = $item['name'];
-						$serial = $item['serial'];
-						$type = $item['type'];
-						$online = $item['online'];
-
+{
+		$device = $item['name'];
+		$serial = $item['serial'];
+		$type = $item['type'];
+		$online = $item['online'];
 
 		$alexatodolist = alexatodolist::byLogicalId($serial, 'alexatodolist');
 		if (!is_object($alexatodolist)) {
@@ -49,7 +45,7 @@ foreach($json as $item)
 		$alexatodolist->setConfiguration('type',$type);
 		$alexatodolist->setStatus('online',$online);
 		$alexatodolist->save();
- }
+}
 */
 
 $eqLogics = alexatodolist::byType('alexatodolist');
@@ -67,29 +63,29 @@ $eqLogics = alexatodolist::byType('alexatodolist');
 		</tr>
 	</thead>
 	<tbody>
-	 <?php
-foreach ($eqLogics as $eqLogic) {
+		<?php
+		foreach ($eqLogics as $eqLogic) {
 
-	if ($eqLogic->getStatus('online') == 'true') {
-		$present = 1;
-	}
-	if ($present == 1){
-		$present = '<span class="label label-success" style="font-size : 1em;" title="{{Présent}}"><i class="fa fa-check-circle"></i></span>';
-	} else {
-		$present = '<span class="label label-danger" style="font-size : 1em;" title="{{Absent}}"><i class="fa fa-times-circle"></i></span>';
-	}
-	
-	if ((strstr($eqLogic->getName(), "Alexa Apps")))
-		$present = '<span class="label label-warning" style="font-size : 1em;" title="{{Inconnu}}"><i class="fa fa-question-circle"></i></span>';
+			if ($eqLogic->getStatus('online') == 'true') {
+				$present = 1;
+			}
+			if ($present == 1) {
+				$present = '<span class="label label-success" style="font-size : 1em;" title="{{Présent}}"><i class="fa fa-check-circle"></i></span>';
+			} else {
+				$present = '<span class="label label-danger" style="font-size : 1em;" title="{{Absent}}"><i class="fa fa-times-circle"></i></span>';
+			}
 
-	echo '<tr><td><a href="' . $eqLogic->getLinkToConfiguration() . '" style="text-decoration: none;">' . $eqLogic->getHumanName(true) . '</a></td>';
-	echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getId() . '</span></td>';
-	echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getConfiguration('device') . '</span></td>';
-	echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getConfiguration('serial') . '</span></td>';
-	echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getConfiguration('type') . '</span></td>';
-	echo '<td>' . $present . '</td>';
-	echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getConfiguration('createtime') . '</span></td></tr>';
-}
-?>
+			if ((strstr($eqLogic->getName(), "Alexa Apps")))
+				$present = '<span class="label label-warning" style="font-size : 1em;" title="{{Inconnu}}"><i class="fa fa-question-circle"></i></span>';
+
+			echo '<tr><td><a href="' . $eqLogic->getLinkToConfiguration() . '" style="text-decoration: none;">' . $eqLogic->getHumanName(true) . '</a></td>';
+			echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getId() . '</span></td>';
+			echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getConfiguration('device') . '</span></td>';
+			echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getConfiguration('serial') . '</span></td>';
+			echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getConfiguration('type') . '</span></td>';
+			echo '<td>' . $present . '</td>';
+			echo '<td><span class="label label-info" style="font-size : 1em; cursor : default;">' . $eqLogic->getConfiguration('createtime') . '</span></td></tr>';
+		}
+		?>
 	</tbody>
 </table>
