@@ -1,0 +1,23 @@
+{
+	"id" : "alexatodolist",
+	"name" : "Alexa - Todo List",
+    "description": {
+        "fr_FR": "Plugin permettant de gérer les listes sur Alexa Premium (NE PAS TELECHARGER EN VERSION BETA)",
+        "en_US": "Plugin for managing lists on Alexa",
+        "es_ES": "Complemento para administrar listas en Alexa",
+        "de_DE": "Plugin zum Verwalten von Listen auf Alexa",
+        "pt_PT": "Plugin para gerenciar listas no Alexa",
+        "ru_RU": "Плагин для управления списками на Alexa",
+        "it_IT": "Plugin per gestire liste su Alexa"
+    },
+	"licence" : "AGPL",
+	"author" : "Jexou",
+	"require" : "4.4",
+	"changelog" : "https://youdom.net/alexa-api-changelog",
+	"documentation" : "https://youdom.net/alexa-todo-list-documentation",
+	"forum_link" : "https://youdom.net/tags/plugin-todolist",
+	"category" : "organization",
+	"hasOwnDeamon" : 0,
+	"language" : ["fr_FR","en_US","de_DE","es_ES","it_IT","pt_PT","ru_RU"],
+	"compatibility" : ["miniplus","smart","rpi","docker","diy","v4","atlas","luna"]
+}

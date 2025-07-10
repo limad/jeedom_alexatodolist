@@ -1,0 +1,210 @@
+<div class="eqLogic eqLogic-widget text-center allowResize" data-eqType="#eqType#" data-eqLogic_id="#id#" data-eqLogic_uid="#uid#" data-version="#version#" data-translate-category="#translate_category#" data-category="#category#" data-tags="#tags#" style="width: #width#;height: #height#;#style#">
+    <div class="widget-name">
+      <span style="color:#background-color#" title="#alert_name#">
+        <i class='#alert_icon#'></i>
+      </span>
+      <span class="cmd refresh pull-right cursor" data-cmd_id="#refresh_id#">
+        <i class="fas fa-sync"></i>
+      </span>
+      <span class="reportModeVisible">#name_display# <span class="object_name">#object_name#</span></span>
+      <a href="#eqLink#" class="reportModeHidden">#name_display# <span class="object_name">#object_name#</span></a>
+    </div>
+    <div class="cmds verticalAlign">
+        <table id="table_items" class="table table-bordered table-condensed tablesorter">
+            <thead class="tablesorter-header-inner">
+              <tr>
+                <th>#Nom#</th>
+                <th>#Editer#</th>
+                <th>#Ajouté le#</th>
+                <th>#Modifié le#</th>
+                <th>#Par#</th>
+                <th>#Statut#</th>
+                <th>#Action#</th>
+              </tr>
+            </thead>
+            <tbody>
+                #dataTable#
+            </tbody>
+        </table>
+    </div>
+    #divGraphInfo#
+    <script>
+        function ajoutItem(item){
+    jeeDialog.prompt({
+    title: "#Ajouter l'élément#",
+    message: '#Nom#', 
+    inputType: 'input', 
+    placeholder: '#Renseignez un nom...#',
+    value: '', 
+    pattern: '^(")', 
+    callback: function(result,event) { 
+        if(result==null || result==''){
+            if(event=='confirm') jeedomUtils.showAlert({message: "#Le nom de l'élément ne peut pas être vide...#",level: 'warning'})
+        }else{ 
+          $.ajax({
+            type: 'POST',
+            url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
+            async: false,
+            global: false,
+            data: {
+                action: "addItem",
+                idList: $(item)[0].getAttribute('data-idList'),
+                text: result
+            },
+            dataType: 'json',
+            error: function (request, status, error) {
+                console.log('erreur desktop/php/alexatodolist.php (modal)');
+
+                //handleAjaxError(request, status, error);
+            },
+            success: function (data) { 
+                    console.log(data.result);
+                    //document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML=result;
+                    //jeeDialog.get('#formAddReminder').destroy()
+                    //document.querySelector('.refreshAction[data-action=refresh]').click();
+            }	
+          });
+        }
+      },
+    },
+    function(result) {
+        if (result !== null) {
+            var name = result
+            console.log('resultat: '+name)
+        }
+    });
+}
+
+function modifierItemCompleted(item){
+     $.ajax({
+            type: 'POST',
+            url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
+            async: false,
+            global: false,
+            data: {
+                action: "modifyItemCompleted",
+                idList: $(item)[0].getAttribute('data-idList'),
+                idItem: $(item)[0].getAttribute('data-idItem'),
+                idEqlogic: $(item)[0].getAttribute('data-idEqlogic'),
+                completed: document.querySelector('#completed'+$(item)[0].getAttribute('data-idEqlogic')).checked,
+                text: document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML,
+                version: Number($(item)[0].getAttribute('data-version'))
+            },
+            dataType: 'json',
+            error: function (request, status, error) {
+                console.log('erreur desktop/php/alexatodolist.php (modal)');
+
+                //handleAjaxError(request, status, error);
+            },
+            success: function (data) { 
+                    console.log(data.result);
+                    //document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML=result;
+                    //jeeDialog.get('#formAddReminder').destroy()
+                    //document.querySelector('.refreshAction[data-action=refresh]').click();
+            }	
+          });
+}
+function modifierItem(item){
+    jeeDialog.prompt({
+    title: "#Modifier l'élément#",
+    message: '#Nouveau nom#', //@required
+    /*width: String,
+    height: String,
+    top: String,*/
+    inputType: 'input', //Default: input'. 'input', 'date', 'time', 'select', 'textarea'
+    /*inputOptions: [ //Options for inputType: 'select'
+        {text: String, value: String},
+    ],*/
+    placeholder: '#Renseignez un nom...#',
+    value: document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML, //Default value for inputType
+    pattern: '^(")', //Validation pattern. Default pattern if inputType 'time' : '[0-9]{4}-[0-9]{2}-[0-9]{2}'
+    /*backdrop: Boolan, //Default: true
+    buttons: {},*/
+    callback: function(result,event) { //@required
+        if(result==null || result==''){
+            if(event=='confirm') jeedomUtils.showAlert({message: "#Le nom de l'élément ne peut pas être vide...#",level: 'warning'})
+        }else{ 
+          $.ajax({
+            type: 'POST',
+            url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
+            async: false,
+            global: false,
+            data: {
+                action: "modifyItem",
+                idList: $(item)[0].getAttribute('data-idList'),
+                idItem: $(item)[0].getAttribute('data-idItem'),
+                idEqlogic: $(item)[0].getAttribute('data-idEqlogic'),
+                completed: document.querySelector('#completed'+$(item)[0].getAttribute('data-idEqlogic')).checked,
+                text: result,
+                version: Number($(item)[0].getAttribute('data-version'))
+            },
+            dataType: 'json',
+            error: function (request, status, error) {
+                console.log('erreur desktop/php/alexatodolist.php (modal)');
+
+                //handleAjaxError(request, status, error);
+            },
+            success: function (data) { 
+                    console.log(data.result);
+                    document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML=result;
+                    //jeeDialog.get('#formAddReminder').destroy()
+                    //document.querySelector('.refreshAction[data-action=refresh]').click();
+            }	
+          });
+        }
+      },
+    },
+    function(result) {
+        if (result !== null) {
+            var name = result
+            console.log('resultat: '+name)
+        }
+    });
+}
+
+function supprimerItem(item){
+    jeeDialog.confirm("#Êtes-vous sûr de vouloir supprimer l'élément ?#", function(result) {
+        if (result) {
+            //Do stuff
+            $.ajax({
+                    type: 'POST',
+                    url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
+                    async: false,
+                    global: false,
+                    data: {
+                        action: "deleteItem",
+                        idList: $(item)[0].getAttribute('data-idList'),
+                        idItem: $(item)[0].getAttribute('data-idItem'),
+                        idEqlogic: $(item)[0].getAttribute('data-idEqlogic')
+                    },
+                    dataType: 'json',
+                    error: function (request, status, error) {
+                        console.log('erreur desktop/php/alexatodolist.php (modal)');
+
+                        //handleAjaxError(request, status, error);
+                    },
+                    success: function (data) { 
+                            console.log(data.result);
+                            //document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML=result;
+                            //jeeDialog.get('#formAddReminder').destroy()
+                            //document.querySelector('.refreshAction[data-action=refresh]').click();
+                    }	
+            });
+        }
+    });
+}
+        /*
+      var _options = { display_value: parseFloat('#wind_direction#') }
+      var directions = ['Nord', 'Nord-Est', 'Est', 'Sud-Est', 'Sud', 'Sud-Ouest', 'Ouest', 'Nord-Ouest']
+      var windDir = directions[Math.round(((_options.display_value %= 360) < 0 ? _options.display_value + 360 : _options.display_value) / 45) % 8]
+      var compass = document.querySelector('.eqLogic[data-eqLogic_uid=#uid#] .widget-compass')
+      compass.querySelector('.widget-compass-needle-placer').style.transform = 'rotate(' + _options.display_value + 'deg)'
+      compass.querySelector('.value').innerHTML = _options.display_value + '°'
+      compass.querySelector('.winDir').innerHTML = windDir
+  */
+      document.querySelector('.eqLogic[data-eqLogic_uid="#uid#"] .refresh').addEventListener('click', function() {
+        jeedom.cmd.execute({ id: '#refresh_id#' })
+      })
+      jeedomUtils.initTableSorter();
+    </script>
+  </div>

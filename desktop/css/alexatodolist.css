@@ -1,0 +1,23 @@
+#table_items th:nth-child(1){
+  width: 30px !important;
+} 
+#table_items th:nth-child(3){
+  width: 80px !important;
+} 
+#table_items th:nth-child(4),#table_items th:nth-child(5){
+  width: 210px !important;
+} 
+#table_items th:nth-child(6){
+  width: 150px !important;
+} 
+#table_items th:nth-child(7){
+  width: 80px !important;
+} 
+#table_items th:nth-child(8){
+  width: 120px !important;
+}
+.flexClass {
+  display:flex !important;
+  align-items: center;
+  margin-right: 40px;
+}

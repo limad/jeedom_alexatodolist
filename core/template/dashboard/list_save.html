@@ -1,0 +1,59 @@
+<div class="eqLogic eqLogic-widget text-center allowResize" data-eqType="#eqType#" data-eqLogic_id="#id#" data-eqLogic_uid="#uid#" data-version="#version#" data-translate-category="#translate_category#" data-category="#category#" data-tags="#tags#" style="width: #width#;height: #height#;#style#">
+    <div class="widget-name">
+      <span style="color:#background-color#" title="#alert_name#">
+        <i class='#alert_icon#'></i>
+      </span>
+      <span class="cmd refresh pull-right cursor" data-cmd_id="#refresh_id#">
+        <i class="fas fa-sync"></i>
+      </span>
+      <span class="reportModeVisible">#name_display# <span class="object_name">#object_name#</span></span>
+      <a href="#eqLink#" class="reportModeHidden">#name_display# <span class="object_name">#object_name#</span></a>
+    </div>
+    <div class="cmds verticalAlign">
+      <div style="display:inline-block">
+        <div style="display:inline-flex">
+          <i class="#icone#" style="font-size:3em;margin:5px"></i>
+          <div>
+            <span style="font-size: 0.8em;" class="cmd noRefresh" data-type="info" data-subtype="string" data-cmd_id="#conditionid#">#condition#</span><br />
+            <span style="font-size: 0.8em;" class="cmd noRefresh" data-type="info" data-subtype="string" data-cmd_id="#tempid#">#temperature# °C / #humidity# %</span><br />
+            <span style="font-size: 0.8em;" class="cmd noRefresh" data-type="info" data-subtype="string" data-cmd_id="#pressureid#">#windspeed# km/h | #pressure# mb</span>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          #forecast#
+        </div>
+      </div>
+      <div class="cmd cmd-widget widget-compass" data-type="info" data-subtype="numeric" data-template="compass" style="display:inline-block">
+        <div class="content">
+          <div class="widget-compass-container">
+            <div class="widget-compass-outline"></div>
+            <div class="widget-compass-needle-placer">
+              <div class="widget-compass-needle"></div>
+            </div>
+          </div>
+          <div class="state">
+            <div class="value"></div>
+            <div class="winDir"></div>
+          </div>
+        </div>
+        <div class="cmd noRefresh" data-type="info" data-subtype="string" data-cmd_id="#sunid#">
+          <i class="fas fa-sun"></i>
+          <div style="font-size: 0.8em;">#sunrise# | #sunset#</div>
+        </div>
+      </div>
+    </div>
+    #divGraphInfo#
+    <script>
+      var _options = { display_value: parseFloat('#wind_direction#') }
+      var directions = ['Nord', 'Nord-Est', 'Est', 'Sud-Est', 'Sud', 'Sud-Ouest', 'Ouest', 'Nord-Ouest']
+      var windDir = directions[Math.round(((_options.display_value %= 360) < 0 ? _options.display_value + 360 : _options.display_value) / 45) % 8]
+      var compass = document.querySelector('.eqLogic[data-eqLogic_uid=#uid#] .widget-compass')
+      compass.querySelector('.widget-compass-needle-placer').style.transform = 'rotate(' + _options.display_value + 'deg)'
+      compass.querySelector('.value').innerHTML = _options.display_value + '°'
+      compass.querySelector('.winDir').innerHTML = windDir
+  
+      document.querySelector('.eqLogic[data-eqLogic_uid="#uid#"] .refresh').addEventListener('click', function() {
+        jeedom.cmd.execute({ id: '#refresh_id#' })
+      })
+    </script>
+  </div>
