@@ -21,10 +21,25 @@ if (!isConnect()) {
 
 
 ?>
+  
+  
+<?php
+            if(!file_exists( __DIR__ . '/../../../plugins/alexaapiv2/core/api/alexa_Api.php')){
+              	$errMsg = 'ATTENTION Le plugin Alexa-Premium est introuvable, il est indispensable au fonctionnement de "Alexa - Todo List"';
+                echo '<div id="div_pageContainer">'
+					.' <div class="alert alert-danger div_alert">'
+					.' <span id="span_errorMessage">'.$errMsg.'</span>'
+					.' </div>'
+					.' <script type="text/javascript" injext="1">document.title = "Alexatodolist - Jeedom"</script>'
+					.' </div>';
+            }
+	
+?>
+
 <legend>{{Gestion du stock}}</legend>
 <fieldset>
 	<div class="col-sm-9">
-		<div class="input-group input-group-sm">
+  		<div class="input-group input-group-sm">
 			<span class="input-group-btn">
 				<a class="btn btn-success listCmdAction input-group-addon roundedLeft" data-type="info">
 					<i class="fa fa-list-alt"></i>

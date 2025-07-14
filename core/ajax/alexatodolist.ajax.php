@@ -28,100 +28,103 @@ try {
 	}
 	//$('.deamonCookieState').empty().append('<span class="label label-success" style="font-size:1em;">00012300</span>');
 	//log::add('alexatodolist', 'info', 'Lancement Serveur pour Cookie - action='.init('action'));
-	switch (init('action')) {
-		case 'createCookie':
-			//log::add('alexatodolist', 'info', 'Debut');
-			$sensor_path = realpath(dirname(__FILE__) . '/../../resources');
-			//Par sécurité, on Kill un éventuel précédent proessus initCookie.js
-			$cmd = 'kill $(ps aux | grep "/initCookie.js" | awk \'{print $2}\')';
-			log::add('alexatodolist', 'debug', '---- Kill initCookie.js: ' . $cmd);
-			$result = exec('nohup ' . $cmd . ' >> ' . log::getPathToLog('alexatodolist_cookie') . ' 2>&1 &');
-			$cmd = 'nice -n 19 nodejs ' . $sensor_path . '/initCookie.js ' . config::byKey('internalAddr');
-			log::add('alexatodolist', 'debug', '---- Lancement démon Alexa-API-Cookie sur port 3457 : ' . $cmd);
-			$result = exec('nohup ' . $cmd . ' >> ' . log::getPathToLog('alexatodolist_cookie') . ' 2>&1 &');
-			if (strpos(strtolower($result), 'error') !== false || strpos(strtolower($result), 'traceback') !== false) {
-				log::add('alexatodolist', 'error', $result);
-				return false;
-			}
-			log::add('alexatodolist', 'info', 'Fin lancement Serveur pour Cookie');
+  	$action = init('action');
+	switch ($action) {
+		case 'removeAll':
+        	$return = alexatodolist::removeAllEqLogics(false);
+        	if($return === true) ajax::success($return);
+        	else{
+              log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");
+              ajax::error($return);
+            }
+			break;
+      	case 'updateItem':
+			log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action "
+					. " listId: ".init('listId')
+					. " itemId: ".init('itemId')
+					. " itemName: ".init('itemName')
+					. " customerId: ".init('customerId')
+					. " version: ".init('version')
+                    . " completed: ".init('completed')
+					. " idCmd: ".init('idCmd')
+					
+            );
+        	
+        	$return = alexatodolist::updateItem(init('listId'), init('itemId'), init('itemName'), init('customerId'), init('version'), init('completed'));
+			if($return === true) ajax::success($return);
+        	else{
+              log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");
+              ajax::error($return);
+            }
+			break;
+		case 'set_itemName':
+			log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action ");
+        	$return = alexatodolist::set_itemName(init('listId'), init('itemId'), init('itemName'), init('version'));
+			if($return === true) ajax::success($return);
+        	else{
+              log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");
+              ajax::error($return);
+            }
+			break;
+		case 'deleteItem':
+			log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action ".init('version'));
+        	$return = alexatodolist::deleteItem(init('listId'), init('itemId'), init('version'));
+			if($return === true) ajax::success($return);
+        	else{
+              log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");
+              ajax::error($return);
+            }
+			break;
+		case 'addItem':
+			log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action");
+        	$return = alexatodolist::addItem(init('listId'), init('itemName'));
 			ajax::success();
 			break;
-		case 'closeCookie':
-			$sensor_path = realpath(dirname(__FILE__) . '/../../resources');
-			//Par sécurité, on Kill un éventuel précédent proessus cookie.js
-			$cmd = 'kill $(ps aux | grep "/initCookie.js" | awk \'{print $2}\')';
-			log::add('alexatodolist', 'debug', '---- Kill initCookie.js: ' . $cmd);
-			$result = exec('nohup ' . $cmd . ' >> ' . log::getPathToLog('alexatodolist_cookie') . ' 2>&1 &');
-			log::add('alexatodolist', 'info', 'Fin lancement Serveur pour Cookie');
+		case 'addList':
+			log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action");
+        	$return = alexatodolist::addList(init('listName'));
+			if($return === true) ajax::success($return);
+        	else{
+              log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");
+              ajax::error($return);
+            }
+			break;
+		case 'removeList':
+			log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action");
+        	$return = alexaapiv2::removeList(init('listName'));
 			ajax::success();
 			break;
-		case 'scanAmazonAlexa':
-			alexatodolist::scanAmazonAlexa();
-			ajax::success();
+		case 'scanlists':
+			log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action");
+        	$return = alexatodolist::scanlists();
+			if($return === true) ajax::success($return);
+        	else{
+              log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");
+              ajax::error($return);
+            }
 			break;
-		case 'forcerDefaultAllCmd':
-			alexatodolist::forcerDefaultAllCmd();
-			ajax::success();
+		case 'getLists':
+			log::add('alexatodolist', 'debug', "Ajax::$action");
+        	$return = alexaapiv2::getLists();
+			if($return === true) ajax::success($return);
+        	else{
+              log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");
+              ajax::error($return);
+            }
 			break;
-		case 'forcerDefaultCmd':
-			$eqLogic = alexatodolist::byId(init('id'));
-			if (!is_object($eqLogic)) {
-				throw new Exception(__('alexatodolist eqLogic non trouvé : ', __FILE__) . init('id'));
-			}
-			alexatodolist::forcerDefaultCmd(init('id'));
-			ajax::success();
-			break;
-		case 'VerifiePresenceCookie':
-			$request = realpath(dirname(__FILE__) . '/../../resources/data/alexa-cookie.json');
-			if (file_exists($request))
-				ajax::success();
-			else
-				ajax::error();
-			break;
-		case 'deamonCookieStart':
-			//on va vérifier que les dépendances sont bien installées
-			$request = realpath(dirname(__FILE__) . '/../../resources/node_modules');
-			if (!(file_exists($request)))
-				ajax::error("Dépendances non présentes, génération manuelle du cookie Amazon impossible !!");
-
-			log::add('alexatodolist', 'info', 'Lancement Serveur pour Cookie - DEBUT deamonCookieStart');
-			alexatodolist::deamonCookie_start();
-			log::add('alexatodolist', 'info', 'Lancement Serveur pour Cookie - DEBUT deamon_info');
-
-			$i = 0;
-			while ($i < 10) {
-				log::add('alexatodolist', 'info', 'Test si serveur cookie lance');
-
-				$pid = trim(shell_exec('ps ax | grep "alexatodolist/resources/initCookie.js" | grep -v "grep" | wc -l'));
-				if ($pid != '' && $pid != '0') {
-					break;
-				}
-				sleep(1);
-				$i++;
-			}
-			if ($i >= 10) {
-				log::add('alexatodolist', 'info', 'SOUCI LANCEMENT SERVEUR COOKIE');
-			}
-
-			alexatodolist::deamon_info();
-			log::add('alexatodolist', 'info', 'Lancement Serveur pour Cookie - FIN   deamonCookieStart');
-			ajax::success();
-			break;
-		case 'deamonCookieStop':
-			alexatodolist::deamonCookie_stop();
-			alexatodolist::deamon_info();
-			ajax::success();
-			break;
-		case 'reinstallNodeJS':
-			$ret = alexatodolist::reinstallNodeJS();
-			ajax::success($ret);
-			break;
-		case 'supprimeTouslesDevices':
-			$ret = alexatodolist::supprimeTouslesDevices();
-			ajax::success($ret);
+		case 'getList':
+        	log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action");
+        	$listId = init('listId');
+        	if($listId == '') ajax::error("l'id de la liste ne peut être vide !");
+			$return = alexaapiv2::getList($listId);
+			if($return === true) ajax::success($return);
+        	else{
+              log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");
+              ajax::error($return);
+            }
 			break;
 	}
-	throw new \Exception('Aucune methode correspondante');
+	throw new \Exception("Aucune methode correspondante à $action");
 } catch (\Exception $e) {
 	ajax::error(displayException($e), $e->getCode());
 	log::add('alexatodolist', 'error', $e);

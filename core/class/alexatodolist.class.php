@@ -1,136 +1,228 @@
 <?php
 require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
+if(!file_exists( __DIR__ . '/../../../../plugins/alexaapiv2/core/api/alexa_Api.php')){
+	log::add('alexatodolist', 'error', 'Le plugin Alexa-Premium est introuvable');
+	throw new Exception(__('Le plugin Alexa-Premium est introuvable', __FILE__));
+}
+else if (!class_exists('alexa_Api')) {
+	require_once __DIR__ . '/../../../../plugins/alexaapiv2/core/api/alexa_Api.php';
+}
 
 class alexatodolist extends eqLogic
 {
 
-	// ####################################################################################			
-	// ####################################################################################			
+// ####################################################################################			
+// ####################################################################################			
 	public static $_widgetPossibility = array('custom' => true, 'custom::layout' => true);
+	
+// ####################################################################################			
+	public static function removeAllEqLogics ($scan = true)
+	{
+		event::add('jeedom::alert', array('level' => 'success', 'page' => __CLASS__, 'message' => __('Suppression en cours ...', __FILE__)));
+		foreach (alexaapiv2::byType(__CLASS__, false) as $eqLogic) {
+			$eqLogic->remove();
+		}
 
-	// ####################################################################################			
-	public static function cron($_eqlogic_id = null)
+		//if ($scan !== false) self::scanAllAlexa();
+	}
+	
+// ####################################################################################			
+	public static function cronHourly($_eqlogic_id = null)
 	{
 		//log::add('alexatodolist', 'debug', '---------------------------------------------CRON------------------------');
 	} 
-*/
-
 	// ####################################################################################			
-	public static function modifyItem($idList, $idItem, $idCmd, $completed, $text, $version)
+	public function refresh($_eqlogic_id = null)
 	{
-		$log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($idList, $idItem, $idCmd, $completed, $text, $version)");
-		data = array('idList' => $idList, 'idItem' => $idItem, 'completed' => $completed, 'text' => $text, 'version' => $version);
-		$result = self::rqstDaemon("modifyItem?" . http_build_query($data));
-		log::add('alexatodolist', 'debug', 'Résultat modifyItem (' . json_encode($result) . ')');
+		log::add('alexatodolist', 'debug', __FUNCTION__ . " start... $_eqlogic_id");
+      	self::scanlists($_eqlogic_id);
+	}
+// ####################################################################################			
+	public static function scanlists($listId=null)
+	{
+		//log::add('alexatodolist', 'debug', __FUNCTION__ . ' start...');
+		$lists = alexa_Api::get_listitems($listId);
+		log::add('alexatodolist', 'debug', __FUNCTION__ . ' Résultat ' . json_encode($lists));
+      	if($listId) $lists = [$lists];
+      	foreach($lists as $logicalId=>$listData){
+          	if($logicalId=="listItems" || $logicalId=="listMetadata") continue;
+          	if(is_numeric($logicalId)) $logicalId = $listData['listInfo']['listId'] ?? null;
+            $config = $listData['listInfo'] ?? [];
+            $listType = $listData['listInfo']['listType'] ?? null;
+            if($listType == "SHOPPING_LIST" || $listType == "TO_DO"){
+                $listName = $listType;
+                $config['listName'] = $listName;
+            }
+            else $listName = $listData['listInfo']['listName'] ?? 'list_'.$logicalId;
+            log::add('alexatodolist', 'debug', '=>'.__FUNCTION__ . " [$listName] => " . json_encode($config));
+            $eqLog = self::createEq($logicalId, $listName, $config);
+			if(is_object($eqLog)){
+              	$listItems = $listData['listItems'] ?? [];
+              	//$listMetadata = $listData['listMetadata'] ?? [];
+              	$eqLog->update_listItems($listItems);//, $listMetadata
+            }
+            
+        }
+
 		return true;
 	}
-
-	// ####################################################################################			
-	public static function modifyItemCompleted($idList, $idItem, $idCmd, $completed, $text, $version)
+	
+// ####################################################################################			
+	public static function createEq($logicalId, $listName, $config)
 	{
-		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($idList, $idItem, $idCmd, $completed, $text, $version)");
-		$data = array('idList' => $idList, 'idItem' => $idItem, 'completed' => $completed, 'text' => $text, 'version' => $version);
-		$result = self::rqstDaemon("modifyItem?" . http_build_query($data));
-		log::add('alexatodolist', 'debug', 'Résultat modifyItemCompleted (' . json_encode($result) . ')');
-		return true;
-	}
-
-	// ####################################################################################			
-	public static function deleteItem($idList, $idItem, $idCmd)
-	{
-		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($idList, $idItem, $idCmd)");
-		$data = array('idList' => $idList, 'idItem' => $idItem);
-		$result = self::rqstDaemon("deleteItem?" . http_build_query($data));
-		log::add('alexatodolist', 'debug', 'Résultat deleteItem (' . json_encode($result) . ')');
-		cmd::byId($idCmd)->remove();
-		return true;
-	}
-
-	// ####################################################################################			
-	public static function addItem($idList, $text)
-	{
-		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($idList, $text)");
-		$data = array('idList' => $idList, 'text' => $text);
-		$result = self::rqstDaemon("addItem?" . http_build_query($data));
-		log::add('alexatodolist', 'debug', 'Résultat addItem (' . json_encode($result) . ')');
-		return true;
-	}
-
-	// ####################################################################################			
-	public static function addList($text)
-	{
-		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($text)");
-		$data = array('nameList' => $text);
-		$result = self::rqstDaemon("addList?" . http_build_query($data));
-		log::add('alexatodolist', 'debug', 'Résultat addList (' . json_encode($result) . ')');
-		return true;
-	}
-
-	// ####################################################################################			
-	public function updateCmd($forceUpdate, $LogicalId, $Type, $SubType, $RunWhenRefresh, $Name, $IsVisible, $title_disable, $setDisplayicon, $infoNameArray, $setTemplate_lien, $request, $infoName, $listValue, $Order, $Test)
-	{
-		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ");
-
-		//self::afficheToutesCommandes("updateCmd");
-		if ($Test) {
-			//log::add('alexatodolist', 'info', 'ajout commande FORCAGE de ' . $LogicalId);
-			try {
-				$cmd = $this->getCmd(null, $LogicalId);
-				if ((!is_object($cmd)) || $forceUpdate) {
-
-					//log::add('alexatodolist', 'info', 'ajout commande FORCAGE forceUpdate :' . $forceUpdate);
-					if (!is_object($cmd)) $cmd = new alexatodolistCmd();
-					$cmd->setType($Type);
-					$cmd->setLogicalId($LogicalId);
-					$cmd->setSubType($SubType);
-					$cmd->setEqLogic_id($this->getId());
-					if (empty($Name)) $Name = $LogicalId; // déplacé le 19/09/2020
-					$cmd->setName($Name);
-					$cmd->setIsVisible((($IsVisible) ? 1 : 0));
-					if (!empty($setTemplate_lien)) {
-						$cmd->setTemplate("dashboard", $setTemplate_lien);
-						$cmd->setTemplate("mobile", $setTemplate_lien);
-					}
-					if (!empty($setDisplayicon)) $cmd->setDisplay('icon', '<i class="' . $setDisplayicon . '"></i>');
-					if (!empty($request)) $cmd->setConfiguration('request', $request);
-					if (!empty($infoName)) $cmd->setConfiguration('infoName', $infoName);
-					if (!empty($infoNameArray)) $cmd->setConfiguration('infoNameArray', $infoNameArray);
-					if (!empty($listValue)) $cmd->setConfiguration('listValue', $listValue);
-					$cmd->setConfiguration('RunWhenRefresh', $RunWhenRefresh);
-					$cmd->setDisplay('title_disable', $title_disable);
-					$cmd->setDisplay('showNameOndashboard', !$title_disable);
-					$cmd->setOrder($Order);
-					//cas particulier
-					if (($LogicalId == 'speak') || ($LogicalId == 'announcement')) {
-						//$cmd->setDisplay('title_placeholder', 'Options');
-						$cmd->setDisplay('message_placeholder', 'Phrase à faire lire par Alexa');
-					}
-					if (($LogicalId == 'reminder')) {
-						//$cmd->setDisplay('title_placeholder', 'Options');
-						$cmd->setDisplay('message_placeholder', 'Texte du rappel');
-					}
-					if (($LogicalId == 'volumeinfo') || ($LogicalId == 'volume')) {
-						$cmd->setConfiguration('minValue', '0');
-						$cmd->setConfiguration('maxValue', '100');
-						$cmd->setDisplay('forceReturnLineBefore', true);
-					}
-					$cmd->save(); // déplacé le 19/09/2020
-					//log::add('alexatodolist', 'info', 'Enregistre Logical ID :' . $cmd->getLogicalId());
-				}
-			} catch (Exception $exc) {
-				log::add('alexatodolist', 'error', __('Erreur pour ', __FILE__) . ' : ' . $exc->getMessage());
-			}
-		} else {
-			//log::add('alexatodolist', 'debug', 'PAS de **'.$LogicalId.'*********************************');
-
-			$cmd = $this->getCmd(null, $LogicalId);
-			if (is_object($cmd)) {
-				$cmd->remove();
-			}
+		if(!$logicalId || $logicalId == '') {
+          	log::add('alexatodolist', 'error', __FUNCTION__ . " logicalId ne peut être null ! $logicalId");
 		}
+        /*
+            $createAt = $config['createAt'] ?? null;
+            $updateAt = $config['updateAt'] ?? null;
+            $shareType = $config['shareType'] ?? null;
+            $listOfListIds = $config['listOfListIds'] ?? null;
+            $isDefaultList = $config['defaultList'] ?? null;
+            $customerId = $config['customerId'] ?? null;
+            $version = $config['version'] ?? null;
+        */
+      	$isArchived = $config['archivedList'] ?? false;
+		$eqLog = alexatodolist::byLogicalId($logicalId, 'alexatodolist');
+        if (!is_object($eqLog)) {
+            if (config::byKey('include_mode', 'alexatodolist') == 1) {
+                log::add('alexatodolist', 'debug', __FUNCTION__ . " include_mode : ".config::byKey('include_mode', 'alexatodolist'));
+				return false;
+            }
+            $eqLog = new alexatodolist();
+            $eqLog->setEqType_name('alexatodolist');
+            $eqLog->setLogicalId($logicalId);
+            $eqLog->setName($listName);
+          	if($isArchived) $eqLog->setIsEnable(0);
+            else $eqLog->setIsEnable(1);
+            $eqLog->setConfiguration('device', "AlexaList_$listName");
+          	$eqLog->setConfiguration('type', $config['listType']);
+          	
+            foreach($config as $key=>$val){
+              	$eqLog->setConfiguration($key, $val);
+            }
+            $type = $config['listType'];
+			$imgPath = dirname(__FILE__) . '/../../../alexaapiv2/core/config/devices/';
+          	if (file_exists($imgPath . $type . '.png')) {
+				$logoImg = $type . '.png';
+			} else $logoImg = 'defautList.png';
+          	$eqLog->setConfiguration('icon', $logoImg);
+          
+          	//log::add('alexatodolist', 'debug', __FUNCTION__ . " start... ($logicalId, $listName, ".json_encode($config).')');
+			$eqLog->save();
+            
+        } 
+      	else {
+            //log::add('alexatodolist', 'debug', __FUNCTION__ . " ($logicalId, $listName) exist ");
+			if($isArchived) $eqLog->setIsEnable(0);
+            if ($eqLog->getConfiguration('device') != "AlexaList_$listName") {
+                $eqLog->setConfiguration('device', "AlexaList_$listName");
+                
+            }
+          	foreach($config as $key=>$val){
+              	$eqLog->setConfiguration($key, $val);
+            }
+            $eqLog->save();
+        }
+      	if (is_object(alexatodolist::byLogicalId($logicalId, 'alexatodolist'))) return alexatodolist::byLogicalId($logicalId, 'alexatodolist');
+      	else return false;
 	}
+	
+// ####################################################################################			
+	public function update_listItems($listItems){
+        $eqName = $this->getName();
+      	log::add('alexatodolist', 'debug', '    '.__FUNCTION__ . " [$eqName] itemsList " . json_encode($listItems));
+        $listId = $this->getLogicalId();
+        $listItemPresent = [];
+      	$items_listAr = [];
+      	$items_Completed = [];
+        $itemsUnCompleted = [];
+        foreach ($listItems as $listItem) {
+        	$itemId = $listItem['id'] ?? null;
+          	$itemName = $listItem['value'] ?? $itemId;
+        	if(!$itemId || $itemId == '') {
+              	log::add('alexatodolist', 'warning', __FUNCTION__ . " [$eqName] No itemId $itemId");
+            	continue;
+            }
+        	$items_listAr[] = $itemId.'|'.$itemName;
+        	
+          	$isCompleted = ($listItem['completed']) ? 'true' : 'false';
+          	if($isCompleted == 'true') $items_Completed[] = $itemId.'|'.$itemName;
+          	else if($isCompleted == 'false') $itemsUnCompleted[] = $itemId.'|'.$itemName;
+			$parameters = array(
+                    'id' => $itemId, 
+                    'listId' => $listItem['listId'], 
+                    'completed' => $listItem['completed'], 
+                    "customerId" => $listItem['customerId'], 
+                    "version" => $listItem['version'], 
+                    "createdDateTime" => $listItem['createdDateTime'], 
+                    "updatedDateTime" => $listItem['updatedDateTime']
+            );
+			
+          	$cmdi = $this->getCmd('info', $itemId);
+			if(!is_object($cmdi)){
+                $cmdi = new alexatodolistCmd();
+                $cmdi->setName($itemName);
+                $cmdi->setType('info');
+                $cmdi->setSubType('string');
+                $cmdi->setEqType('alexatodolist');
+                $cmdi->setEqLogic_id($this->getId());
+                $cmdi->setIsHistorized(0);
+                $cmdi->setIsVisible(0);
+                $cmdi->setConfiguration('itemId', $itemId);
+                $cmdi->setConfiguration('type', 'item');
+                $cmdi->setLogicalId($itemId);
+            }
+        	else {
+				$cmdi->setName($itemName);
+				$cmdi->setLogicalId($itemId);
+				$cmdi->setIsVisible(0);
+              	$cmdi->setConfiguration('type', 'item');
+            }
+          	$listItemPresent[] = $itemId;
+			$cmdi->setConfiguration('parameters', $parameters);
+			$cmdi->save();
+            log::add('alexatodolist', 'debug', '    '.__FUNCTION__ . " [$eqName] maj item : ".$itemName." => ".json_encode($parameters));
+			$this->checkAndUpdateCmd($itemId, $isCompleted);
+				
+        }
+      	//log::add('alexatodolist', 'debug', '    '.__FUNCTION__ . " [$eqName] listItemPresent ".json_encode($listItemPresent));
+        //$cmdis = cmd::byEqLogicId($this->getId(), 'info');
+      	$cmdis = $this->getCmd('info');
+		foreach ($cmdis as $cmdi) {
+          	if($cmdi->getConfiguration('type', '') != 'item') continue;
+          	$cmdi_LogId = $cmdi->getLogicalId();
+          	$cmdi_Name = $cmdi->getName();
+          	if(!in_array($cmdi_LogId, $listItemPresent)){
+              	log::add('alexatodolist', 'warning', '    '.__FUNCTION__ . " [$eqName][$cmdi_Name] itemcmd $cmdi_LogId n'est plus présent ");
+              	$cmdi->remove();
+            }
+        }
+      	
+      	$this->checkAndUpdateCmd('date_maj', date("Y-m-d H:i"));
+      	$this->checkAndUpdateCmd('items_list', implode(';', $items_listAr));
+      
+      	$cmd_deleteItem = $this->getCmd(null, 'deleteItem');
+      	if(is_object($cmd_deleteItem)){
+            $cmd_deleteItem->setConfiguration('listValue', implode(';', $items_listAr));
+            $cmd_deleteItem->save();
+        }
+      
+      	$cmd_completed_on = $this->getCmd(null, 'completed_on');
+      	if(is_object($cmd_completed_on)){
+            $cmd_completed_on->setConfiguration('listValue', implode(';', $items_Completed));
+            $cmd_completed_on->save();
+        }
+      
+      	$cmd_completed_off = $this->getCmd(null, 'completed_off');
+      	if(is_object($cmd_completed_off)){
+            $cmd_completed_off->setConfiguration('listValue', implode(';', $itemsUnCompleted));
+            $cmd_completed_off->save();
+        } 
+    }
+	
 
-	// ####################################################################################			
+// ####################################################################################			
 	public function afficheToutesCommandes($Position)
 	{
 		log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " start");
@@ -139,18 +231,167 @@ class alexatodolist extends eqLogic
 		}
 	}
 
-	// ####################################################################################			
+
+// ####################################################################################			
+	public static function deleteItem($listId, $itemId, $version)
+	{
+		//$eqName = $this->getName();
+      	log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($listId, $itemId, $version)");
+		$eqSys = alexaapiv2::byLogicalId('AlexaSys', 'alexaapiv2');
+		if (is_object($eqSys)) {
+			$appId = $eqSys->getConfiguration('system_deviceSerial', null);
+		}
+		$result = alexa_Api::deleteItem ($listId, $itemId, $version, $appId);
+      	log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " Résultat ($listId, $itemId, $version, $appId) => " . json_encode($result));
+		if(isset($result['code']) && $result['code'] == 200){
+          	self::scanlists($listId);
+          	return true;
+        }else{
+          	$code = $result['code'] ?? '';
+          	$errorMessage = ($result['body']['errorType'] ?? ''). ' => '.($result['body']['errorMessage'] ?? '');
+          	$msg = "code($code) ";
+          	$msg .= ($errorMessage !='') ? $errorMessage : ($result['body'] ?? '');
+          	log::add('alexatodolist', 'warning', __CLASS__ . '::' . __FUNCTION__ . " $msg ");
+			throw new Exception(__($msg, __FILE__));
+          	return $msg;
+        }
+      	return true;
+	}// ####################################################################################			
+	public static function addItem ($listId, $itemName)
+	{
+		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($listId, $itemName)");
+		$result = alexa_Api::addItem($listId, $itemName);
+    	if(isset($result['itemInfoList'][0]['itemName']) && $result['itemInfoList'][0]['itemName'] == $itemName){
+          	self::scanlists($listId);
+          	return true;
+        }else{
+          	$code = $result['code'] ?? '';
+          	$errorMessage = ($result['body']['errorType'] ?? ''). ' => '.($result['body']['errorMessage'] ?? '');
+          	$msg = "code($code) ";
+          	$msg .= ($errorMessage !='') ? $errorMessage : ($result['body'] ?? '');
+          	log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " Résultat" . json_encode($result));
+			log::add('alexatodolist', 'warning', __CLASS__ . '::' . __FUNCTION__ . " $msg ");
+			throw new Exception(__($msg, __FILE__));
+          	return $msg;
+        }
+    }
+
+// ####################################################################################			
+	public static function addList($listName)
+	{
+		$eqSys = alexaapiv2::byLogicalId('AlexaSys', 'alexaapiv2');
+		if (is_object($eqSys)) {
+			$customerId = $eqSys->getConfiguration('OwnerCustomerId', null);
+		}
+		
+      	log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($listName)");
+		$result = alexa_Api::addList($listName);
+     	log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " Résultat => " . json_encode($result));
+		if(isset($result['listInfo']['listName']) && $result['listInfo']['listName'] == $listName){
+          	self::scanlists($listId);
+          	return true;
+        }else{
+          	$code = $result['code'] ?? '';
+          	$errorMessage = ($result['body']['errorType'] ?? ''). ' => '.($result['body']['errorMessage'] ?? '');
+          	$msg = "code($code) ";
+          	$msg .= ($errorMessage !='') ? $errorMessage : ($result['body'] ?? '');
+          	log::add('alexatodolist', 'warning', __CLASS__ . '::' . __FUNCTION__ . " $msg ");
+			throw new Exception(__($msg, __FILE__));
+          	return $msg;
+        }
+    }
+
+  // ####################################################################################			
+	public static function modifyItem($listId, $itemId, $idCmd, $completed, $text, $version)
+	{
+		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($listId, $itemId, $idCmd, $completed, $text, $version)");
+		$data = array('listId' => $listId, 'itemId' => $itemId, 'completed' => $completed, 'text' => $text, 'version' => $version);
+	if(isset($result['itemInfo']['listName']) && $result['itemInfo']['listName'] == $listName){
+          	self::scanlists($listId);
+          	return true;
+        }else{
+          	$code = $result['code'] ?? '';
+          	$errorMessage = ($result['body']['errorType'] ?? ''). ' => '.($result['body']['errorMessage'] ?? '');
+          	$msg = "code($code) ";
+          	$msg .= ($errorMessage !='') ? $errorMessage : ($result['body'] ?? '');
+          	log::add('alexatodolist', 'warning', __CLASS__ . '::' . __FUNCTION__ . " $msg ");
+			throw new Exception(__($msg, __FILE__));
+          	return $msg;
+        }
+    }
+  
+// ####################################################################################			
+	public static function set_itemName ($listId, $itemId, $itemName, $version)
+	{
+		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($listId, $itemId, $itemName, $version)");
+		$result = alexa_Api::set_itemName($listId, $itemId, $itemName, $version);
+      	/*
+        {
+        	"id":"02c64b14-390e-401f-9046-aae3a8f4209e",
+        	"listId":"e6b94ff8-cc61-4770-90cd-1534328ecea4",
+        	"value":"el25",
+            "encryptedValue":"AAAAAAAAAQDyx++7QVEMh\/9SGYa54Xf7IAAAAAAAAABzD1m6fBt6h6tnQt5Z\/CjUj12f6FWKsyiddJqGndIN8Q==",
+            "updatedDateTime":1752327212192,
+            "createdDateTime":1752310350150,
+            "customerId":"A3BREYYLMVGASM",
+            "version":3,
+            "completed":false,
+            "itemType":"KEYWORD",
+            "listItemMetadata":[]
+        }
+        */
+      	log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " Résultat" . json_encode($result));
+		if(isset($result['itemInfo']['itemName']) && $result['itemInfo']['itemName'] == $itemName){
+          	self::scanlists($listId);
+          	return true;
+        }else{
+          	$code = $result['code'] ?? '';
+          	$errorMessage = ($result['body']['errorType'] ?? ''). ' => '.($result['body']['errorMessage'] ?? '');
+          	$msg = "code($code) ";
+          	$msg .= ($errorMessage !='') ? $errorMessage : ($result['body'] ?? '');
+          	log::add('alexatodolist', 'warning', __CLASS__ . '::' . __FUNCTION__ . " $msg ");
+			throw new Exception(__($msg, __FILE__));
+          	return $msg;
+        }
+		
+	}
+// ####################################################################################			
+	public function callApi($function, $data=array())
+	{
+		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start");
+		$eqName = $this->getName();
+      	$class = "alexa_Api";
+      	if(method_exists("alexa_Api", $function)){
+			
+		}else if(method_exists("alexaapiv2", $function)){
+			$class = "alexaapiv2";
+		}else{
+			echo "<br>function: $class::$function NOT exist";
+          	return "function: $function NOT found in $class";
+		} 
+      	$return = call_user_func_array([$class, $function], $data);
+      	return $return;
+	}  
+// ####################################################################################			
 	public function postSave()
 	{
-		//self::afficheToutesCommandes("postSave");
-
-		log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " start");
-		$F = $this->getStatus('forceUpdate'); // forceUpdate permet de recharger les commandes à valeur d'origine, mais sans supprimer/recréer les commandes
-		$capa = $this->getConfiguration('capabilities', '');
-		$type = $this->getConfiguration('type', '');
-		$cmd = $this->getCmd(null, 'refresh');
+		$eqName = $this->getName();
+      	//log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " [$eqName] start");
+		if($this->getConfiguration('cmdsMaked', false) != true){
+          	$this->makeCmds();
+        }
+	}
+  
+// ####################################################################################			
+	public function makeCmds()
+	{
+      	$eqName = $this->getName();
+      	log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " [$eqName] start");
+		$createCount = 0;
+      	$updateCount = 0;
+      	$cmd = $this->getCmd(null, 'refresh');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info', 'ajout commande Refresh');
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande Refresh");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('refresh');
 			$cmd->setIsVisible(1);
@@ -161,10 +402,28 @@ class alexatodolist extends eqLogic
 			$cmd->setSubType('other');
 			$cmd->setEqLogic_id($this->getId());
 			$cmd->save();
+          	$createCount++;
 		}
-		$cmd_maj = $this->getCmd(null, 'date_maj');
-		if (!is_object($cmd_maj)) {
-			log::add('alexatodolist', 'info', 'ajout commande date_maj');
+      
+		$cmd = $this->getCmd(null, 'items_list');
+		if (!is_object($cmd)) {
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande itemsList");
+			$cmd = new alexatodolistCmd();
+			$cmd->setLogicalId('items_list');
+			$cmd->setIsVisible(0);
+			$cmd->setOrder("2");
+			$cmd->setDisplay('icon', '<i class="fas fa-list"></i>');
+			$cmd->setName(__('Liste des éléments', __FILE__));
+			$cmd->setType('info');
+			$cmd->setSubType('string');
+			$cmd->setEqLogic_id($this->getId());
+			$cmd->save();
+		  	$createCount++;
+		}
+      
+		$cmd = $this->getCmd(null, 'date_maj');
+		if (!is_object($cmd)) {
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande date_maj");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('date_maj');
 			$cmd->setIsVisible(1);
@@ -175,84 +434,119 @@ class alexatodolist extends eqLogic
 			$cmd->setSubType('string');
 			$cmd->setEqLogic_id($this->getId());
 			$cmd->save();
+		  	$createCount++;
 		}
-		$cmd_maj = $this->getCmd(null, 'addItem');
-		if (!is_object($cmd_maj)) {
-			log::add('alexatodolist', 'action', 'ajout commande addItem');
+      
+		$cmd = $this->getCmd(null, 'addItem');
+		if (!is_object($cmd)) {
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande addItem");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('addItem');
 			$cmd->setIsVisible(1);
 			$cmd->setOrder("3");
 			$cmd->setName(__('AddItem', __FILE__));
 			$cmd->setType('action');
-			$cmd->setSubType('other');
-			$cmd->setConfiguration('request', '/addItem?text=#text#');
-			$cmd->setEqLogic_id($this->getId());
+			$cmd->setSubType('message');
+          	$cmd->setConfiguration('listValue', '');
+          	$cmd->setConfiguration('request', 'addItem?itemName=#title#');
+			$cmd->setDisplay('message_disable', 1);
+           	$cmd->setDisplay('title_placeholder', "Nom de l'élément");
+           	$cmd->setEqLogic_id($this->getId());
 			$cmd->save();
 		}
-		$cmd_maj = $this->getCmd(null, 'modifyItem');
-		if (!is_object($cmd_maj)) {
-			log::add('alexatodolist', 'action', 'ajout commande modifyItem');
-			$cmd = new alexatodolistCmd();
-			$cmd->setLogicalId('modifyItem');
-			$cmd->setIsVisible(1);
-			$cmd->setOrder("4");
-			$cmd->setName(__('modifyItem', __FILE__));
-			$cmd->setType('action');
-			$cmd->setSubType('other');
-			$cmd->setConfiguration('request', '/modifyItem?idItem=#idItem#&completed=#completed#&text=#text#');
-			$cmd->setEqLogic_id($this->getId());
-			$cmd->save();
-		}
-		$cmd_maj = $this->getCmd(null, 'deleteItem');
-		if (!is_object($cmd_maj)) {
-			log::add('alexatodolist', 'action', 'ajout commande deleteItem');
+      
+		$cmd = $this->getCmd(null, 'deleteItem');
+		if (!is_object($cmd)) {
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande deleteItem");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('deleteItem');
 			$cmd->setIsVisible(1);
 			$cmd->setOrder("5");
 			$cmd->setName(__('deleteItem', __FILE__));
 			$cmd->setType('action');
+			$cmd->setSubType('select');
+			$cmd->setConfiguration('request', 'deleteItem?itemId=#itemId#');
+			$cmd->setEqLogic_id($this->getId());
+          	$cmd->setConfiguration('listValue', '');
+          	$cmd->save();
+		  	$createCount++;
+		}else $updateCount++;
+      	
+        $cmd = $this->getCmd(null, 'updateItem');
+		if (!is_object($cmd)) {
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande updateItem");
+			$cmd = new alexatodolistCmd();
+			$cmd->setLogicalId('updateItem');
+			$cmd->setIsVisible(0);
+			$cmd->setOrder("4");
+			$cmd->setName(__('updateItem', __FILE__));
+			$cmd->setType('action');
 			$cmd->setSubType('other');
-			$cmd->setConfiguration('request', '/deleteItem?idItem=#idItem#');
+			$cmd->setConfiguration('request', 'updateItem?itemId=#itemId#&completed=#completed#&text=#text#');
 			$cmd->setEqLogic_id($this->getId());
 			$cmd->save();
+		  	$createCount++;
 		}
-
-		$this->setStatus('forceUpdate', false); //dans tous les cas, on repasse forceUpdate à false
-
-	}
-
-	// ####################################################################################			
-	public function preUpdate()
-	{
-		//log::add('alexatodolist', 'debug', '-------------------------------preUpdate '.$this->getName().'***********************************');
-		//self::afficheToutesCommandes("preUpdate");
-
-	}
-
-	// ####################################################################################			
-	public function preRemove()
-	{
-		if ($this->getConfiguration('devicetype') == "Player") { // Si c'est un type Player, il faut supprimer le Device Playlist
-			$device_playlist = str_replace("_player", "", $this->getConfiguration('serial')) . "_playlist"; //Nom du device de la playlist
-			$eq = eqLogic::byLogicalId($device_playlist, 'alexatodolist');
-			if (is_object($eq)) $eq->remove();
+      
+		$cmd = $this->getCmd(null, 'completed_on');
+		if (!is_object($cmd)) {
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande completed_on");
+			$cmd = new alexatodolistCmd();
+			$cmd->setLogicalId('completed_on');
+			$cmd->setIsVisible(1);
+			$cmd->setOrder("5");
+			$cmd->setName(__('Elément accompli', __FILE__));
+			$cmd->setType('action');
+			$cmd->setSubType('select');
+			$cmd->setConfiguration('request', 'updateItem?itemId=#select#&completed=true');
+			$cmd->setEqLogic_id($this->getId());
+          	$cmd->setConfiguration('listValue', '');
+          	$cmd->save();
+		  	$createCount++;
+		}else $updateCount++;
+      
+      	$cmd = $this->getCmd(null, 'completed_off');
+		if (!is_object($cmd)) {
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande completed_off");
+			$cmd = new alexatodolistCmd();
+			$cmd->setLogicalId('completed_off');
+			$cmd->setIsVisible(1);
+			$cmd->setOrder("5");
+			$cmd->setName(__('Elément Non accompli', __FILE__));
+			$cmd->setType('action');
+			$cmd->setSubType('select');
+			$cmd->setConfiguration('request', 'modifyItem?itemId=#select#&completed=false');
+			$cmd->setEqLogic_id($this->getId());
+          	$cmd->setConfiguration('listValue', '');
+          	$cmd->save();
+		  	$createCount++;
+		}else $updateCount++;
+      
+      	$cmd = $this->getCmd(null, 'setArchived');
+		if (!is_object($cmd)) {
+			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande updateItem");
+			$cmd = new alexatodolistCmd();
+			$cmd->setLogicalId('setArchived');
+			$cmd->setIsVisible(1);
+			$cmd->setOrder("4");
+			$cmd->setName(__('Archiver', __FILE__));
+			$cmd->setType('action');
+			$cmd->setSubType('other');
+			$cmd->setConfiguration('request', 'setArchived?itemId=#itemId#&completed=#completed#&text=#text#');
+			$cmd->setEqLogic_id($this->getId());
+			$cmd->save();
+		  	$createCount++;
 		}
-		//log::add('alexatodolist', 'debug', '-------------------------------preRemove '.$this->getName().'***********************************');
-	}
+      
+      	$this->setStatus('forceUpdate', false); //dans tous les cas, on repasse forceUpdate à false
+		if($updateCount>0 || $createCount>0){
+          	$this->setConfiguration('cmdsMaked', true);
+        	$this->save();
+      	}
+      	return ($createCount + $updateCount);
+    }
 
-	// ####################################################################################			
-	public function preSave()
-	{
-		//log::add('alexatodolist', 'debug', '-------------------------------preSave '.$this->getName().'***********************************');
-		//self::afficheToutesCommandes("preSave");
-	}
-
-	// https://github.com/NextDom/NextDom/wiki/Ajout-d%27un-template-a-votre-plugin
-	// https://jeedom.github.io/documentation/dev/fr_FR/widget_plugin
-
-	// ####################################################################################			
+// ####################################################################################			
 	public function toHtml($_version = 'dashboard')
 	{
 		$replace = $this->preToHtml($_version);
@@ -282,25 +576,25 @@ class alexatodolist extends eqLogic
 		$replace["#Êtes-vous sûr de vouloir supprimer l'élément ?#"] = __("Êtes-vous sûr de vouloir supprimer l'élément ?", __FILE__);
 		$replace['#Action#'] = __('Action', __FILE__);
 		$dataTable = '';
-		//$idList=$this->getId();
+		//$listId=$this->getId();
 		$listItems = eqLogic::byTypeAndSearchConfiguration('alexatodolist', array("eqlogicList" => $this->getId()));
 		foreach ($listItems as $item) {
 			$dataTable .= "<tr>";
 			$dataTable .= '<td id="name' . $item->getId() . '">' . $item->getName() . '</td>';
-			$dataTable .= '<td><a class="btn btn-default btn-sm cmdAction" onclick="modifierItem(this)"' . " title=\"" . __("Modifier le nom de l'élément", __FILE__) . "\"" . ' data-idItem="' . $item->getConfiguration('id') . '" data-idEqlogic="' . $item->getId() . '" data-idList="' . $this->getConfiguration('itemId') . '" data-version="' . $item->getConfiguration('version') . '"><i class="fas fa-cog"></i></a></td>';
+			$dataTable .= '<td><a class="btn btn-default btn-sm cmdAction" onclick="modifierItem(this)"' . " title=\"" . __("Modifier le nom de l'élément", __FILE__) . "\"" . ' data-itemId="' . $item->getConfiguration('id') . '" data-idEqlogic="' . $item->getId() . '" data-listId="' . $this->getConfiguration('itemId') . '" data-version="' . $item->getConfiguration('version') . '"><i class="fas fa-cog"></i></a></td>';
 			$dataTable .= "<td>" . date('H\hi \l\e d/m/Y', ($item->getConfiguration('createdDateTime') / 1000)) . "</td>";
 			$dataTable .= "<td>" . date('H\hi \l\e d/m/Y', ($item->getConfiguration('updatedDateTime') / 1000)) . "</td>";
 			$dataTable .= "<td>" . $item->getConfiguration('customerId') . "</td>";
-			$dataTable .= '<td><input id="completed' . $item->getId() . '" onclick="modifierItemCompleted(this)" type="checkbox" class="" data-l1key="configuration" data-l2key="completed" data-idItem="' . $item->getConfiguration('id') . '" data-idEqlogic="' . $item->getId() . '" data-idList="' . $this->getConfiguration('itemId') . '" data-version="' . $item->getConfiguration('version') . '" ' . ($item->getConfiguration('completed') == '1' ? 'checked="checked"' : '') . '></td>';
+			$dataTable .= '<td><input id="completed' . $item->getId() . '" onclick="modifierItemCompleted(this)" type="checkbox" class="" data-l1key="configuration" data-l2key="completed" data-itemId="' . $item->getConfiguration('id') . '" data-idEqlogic="' . $item->getId() . '" data-listId="' . $this->getConfiguration('itemId') . '" data-version="' . $item->getConfiguration('version') . '" ' . ($item->getConfiguration('completed') == '1' ? 'checked="checked"' : '') . '></td>';
 			$dataTable .= "<td>";
-			$dataTable .= '<a class="btn btn-danger btn-sm cmdAction" onclick="supprimerItem(this)" data-idItem="' . $item->getConfiguration('id') . '" data-idEqlogic="' . $item->getId() . '" data-idList="' . $this->getConfiguration('itemId') . '" data-version="' . $item->getConfiguration('version') . '"><i class="fas fa-minus-circle"></i> ' . __("Supprimer", __FILE__) . '</a>';
+			$dataTable .= '<a class="btn btn-danger btn-sm cmdAction" onclick="supprimerItem(this)" data-itemId="' . $item->getConfiguration('id') . '" data-idEqlogic="' . $item->getId() . '" data-listId="' . $this->getConfiguration('itemId') . '" data-version="' . $item->getConfiguration('version') . '"><i class="fas fa-minus-circle"></i> ' . __("Supprimer", __FILE__) . '</a>';
 			$dataTable .= "</td>";
 			$dataTable .= "</tr>";
 		}
 
 		$replace['#dataTable#'] = $dataTable;
 		foreach ($this->getCmd('info') as $cmd) {
-			//log::add('alexatodolist_widget','debug',$typeWidget.'dans boucle génération Widget');
+			//log::add('alexatodolist_widget','debug',  __FUNCTION__ ." $typeWidget dans boucle génération Widget");
 			$replace['#' . $cmd->getLogicalId() . '_history#'] = '';
 			$replace['#' . $cmd->getLogicalId() . '_id#'] = $cmd->getId();
 			$replace['#' . $cmd->getLogicalId() . '#'] = $cmd->execCmd();
@@ -322,31 +616,80 @@ class alexatodolistCmd extends cmd
 {
 	public function execute($_options = array())
 	{
-		/*if ($this->getLogicalId() == 'refresh') {
-			$result = file_get_contents("http://" . config::byKey('internalAddr') . ":3466/getListItems?idList=".$this->getEqLogic()->getConfiguration('itemId'));
-			log::add('alexatodolist', 'debug', 'Lancement requete maj de la liste (cmd refresh) "'.$this->getEqLogic()->getName().'" (requete: ' . "http://" . config::byKey('internalAddr') . ":3466/getListItems?idList=".$this->getEqLogic()->getConfiguration('itemId') . ')');
-			$this->getEqLogic()->refresh();
-			return true;
-		}*/
-		log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " start");
+		$eqLogic = $this->getEqLogic();
+      	$eqLogicId = $eqLogic->getLogicalId();
+      	$eqName = $eqLogic->getName();
+        $listId = $eqLogic->getConfiguration('listId');
+      	$cmdLogId = $this->getLogicalId();
 
-		$listId = $this->getEqLogic()->getConfiguration('itemId', '');
-		switch ($this->getLogicalId()) {
+		log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " [$eqName] $cmdLogId start ");
+		switch ($cmdLogId) {
 			case 'refresh':
-				$result = file_get_contents("http://" . config::byKey('internalAddr') . ":3466/getListItems?idList=" . $listId);
-				log::add('alexatodolist', 'debug', 'Mise à jour de la liste "' . $this->getEqLogic()->getName());
-				$this->getEqLogic()->refresh();
+				$eqLogic->refresh($eqLogicId);
 				break;
 			case 'addItem':
-				//$result = file_get_contents("http://" . config::byKey('internalAddr') . ":3466/addItem?idList=".$listId);
-				//log::add('alexatodolist', 'debug', 'Ajout élément "'.urlencode().'" dans la liste "'.$this->getEqLogic()->getName());
-				log::add('alexatodolist', 'debug', 'Ajout élément "" dans la liste "' . $this->getEqLogic()->getName());
-				log::add('alexatodolist', 'debug', '--->' . print_r($_options, true));
-
-				break;
-			case 'modifyItem':
+            	$itemName = $_options['title'];
+            	log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId -> ($listId, $itemName)");
+				//$command = $eqLogic->callApi('addItem', array($listId, $itemName));
+            	$command = alexatodolist::addItem($listId, $_options['title']);
+				log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId  result => ".json_encode($command));
+           	break;
+			case 'updateItem':
+            	log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId -> ($listId, $itemName)");
+				$command = $eqLogic->callApi('set_itemName', array($listId, $itemId, $itemName));
+				log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId  result => ".json_encode($command));
 				break;
 			case 'deleteItem':
+            	$itemId = $_options['select'];
+            	$cmdItem = $eqLogic->getCmd(null, $itemId);
+            	$version = $cmdItem->getConfiguration('parameters', [])['version'] ?? null;
+            	log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId -> ($listId, $itemId, $version)");
+				$command = alexatodolist::deleteItem($listId, $itemId, $version);
+				log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId  result => ".json_encode($command));
+            
+            	break;
+			case 'completed_off':
+            	$itemId = $_options['select'];
+            	$cmdItem = $eqLogic->getCmd(null, $itemId);
+            	$version = $cmdItem->getConfiguration('parameters', [])['version'] ?? null;
+            	log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId -> ($listId, $itemsId, 'ACTIVE')");
+				$command = $eqLogic->callApi('set_itemComplete', array($listId, $itemsId, 'ACTIVE', $version));
+				$commandStatus = $command['itemInfo']['itemStatus'] ?? null;
+            	if($commandStatus=="ACTIVE") {
+					log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId Success => ".json_encode($command));
+                  	$eqLogic->refresh($listId);
+                  	return true;
+                }
+				else log::add('alexatodolist', 'warning',  __FUNCTION__ ." $cmdLogId  result => ".json_encode($command));
+				break;
+			case 'completed_on':
+				$itemId = $_options['select'];
+            	log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId -> ($listId, $itemsId, 'COMPLETE')");
+				$cmdItem = $eqLogic->getCmd(null, $itemId);
+            	$version = $cmdItem->getConfiguration('parameters', [])['version'] ?? null;
+            	$command = $eqLogic->callApi('set_itemComplete', array($listId, $itemId, 'COMPLETE', $version));
+            	$commandStatus = $command['itemInfo']['itemStatus'] ?? null;
+            	if($commandStatus=="COMPLETE") {
+					log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId Success => ".json_encode($command));
+                  	$eqLogic->refresh($listId);
+                  	return true;
+                }else log::add('alexatodolist', 'warning',  __FUNCTION__ ." $cmdLogId  result => ".json_encode($command));
+				break;
+			case 'setArchived':
+            	log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] $cmdLogId => ($listId, 'ARCHIVED')");
+				$command = $eqLogic->callApi('set_listArchived', array($listId, 'ARCHIVED'));
+				$commandStatus = $command['listInfo']['listStatus'] ?? null;
+            	if($commandStatus=="ARCHIVED") {
+					log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId Success => ".json_encode($command));
+                  	$eqLogic->refresh($listId);
+                  	return true;
+                }else log::add('alexatodolist', 'warning',  __FUNCTION__ ." $cmdLogId  result => ".json_encode($command));
+				
+                  
+                  log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId  result => ".json_encode($command));
+				break;
+        	default:
+				log::add('alexatodolist', 'error', ' ' . __FUNCTION__ . " [$eqName] Commande inconnue '$cmdLogId' ");
 				break;
 		}
 		return true;
@@ -354,8 +697,6 @@ class alexatodolistCmd extends cmd
 
 	public function dontRemoveCmd()
 	{
-		//		log::add('alexatodolist', 'debug', 'LANCE dontRemoveCmd cmd');
-
 		if ($this->getLogicalId() == 'refresh') {
 			return true;
 		}
@@ -364,14 +705,10 @@ class alexatodolistCmd extends cmd
 
 	public function postSave()
 	{
-		//log::add('alexatodolist', 'debug', '**********************postSave '.$this->getName().'***********************************'.$this->getLogicalId());
-
 	}
 
 	public function preSave()
 	{
-		//   log::add('alexatodolist', 'debug', '**********************preSave '.$this->getName().'***********************************'.$this->getLogicalId());
-
 		if ($this->getLogicalId() == 'refresh') {
 			return;
 		}
@@ -388,183 +725,7 @@ class alexatodolistCmd extends cmd
 			$arguments = "";
 		}
 
-		//$_resultat=$this->lanceCommande("test",$command);
-
-
-		/*
-		
-		switch ($command) {
-			case 'volume':
-				$request = $this->build_ControledeSliderSelectMessage($_options, '50');
-				break;
-			case 'playlist':
-			case 'routine':
-				$request = $this->build_ControledeSliderSelectMessage($_options, "");
-				break;
-			case 'playmusictrack':
-				$request = $this->build_ControledeSliderSelectMessage($_options, "53bfa26d-f24c-4b13-97a8-8c3debdf06f0");
-				break;
-			case 'speak':
-			case 'announcement':
-			case 'push':
-			case 'multiplenext':
-				$request = $this->build_ControledeSliderSelectMessage($_options);
-				break;
-			case 'reminder':
-			case 'alarm':
-				$now = date("Y-m-d H:i:s", strtotime('+3 second'));
-				$request = $this->build_ControleWhenTextRecurring($now, "Ceci est un essai", $_options);
-				break;
-			case 'radio':
-				$request = $this->build_ControledeSliderSelectMessage($_options, 's2960');
-				break;
-			case 'SmarthomeCommand':
-				$request = $this->build_ControledeSliderSelectMessage();
-				break;
-			case 'command':
-				$request = $this->build_ControledeSliderSelectMessage($_options, 'pause');
-				break;
-			case 'whennextalarm':
-			case 'whennextmusicalalarm':
-			case 'musicalalarmmusicentity':
-			case 'whennextreminderlabel':
-			case 'whennextreminder':
-				$request = $this->build_ControlePosition($_options);
-				break;
-			case 'updateallalarms':
-				$request = $this->build_ControleRien($_options);
-				break;
-			case 'deleteallalarms':
-				$request = $this->buildDeleteAllAlarmsRequest($_options);
-				break;
-			case 'deleteReminder':
-				$request = $this->buildDeleteReminderRequest($_options);
-				break;
-			case 'restart':
-				$request = $this->buildRestartRequest($_options);
-				break;
-			default:
-				$request = '';
-				break;
-		}
-		//log::add('alexatodolist_debug', 'debug', '----RequestFinale:'.$request);
-		$request = scenarioExpression::setTags($request);
-		if (trim($request) == '') throw new Exception(__('Commande inconnue ou requête vide : ', __FILE__) . print_r($this, true));
-		$device = str_replace("_player", "", $this->getEqLogic()->getConfiguration('serial'));
-		return 'http://' . config::byKey('internalAddr') . ':3466/' . $request . '&device=' . $device;
-		*/
 		return true;
 	}
 
-
-	private function build_ControledeSliderSelectMessage($_options = array(), $default = "Ceci est un message de test")
-	{
-		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start " . json_encode($_options));
-		$cmd = $this->getEqLogic()->getCmd(null, 'volumeinfo');
-		if (is_object($cmd))
-			$lastvolume = $cmd->execCmd();
-
-		$request = escapeshellcmd($this->getConfiguration('request'));
-		//log::add('alexatodolist_node', 'info', '---->Request2:'.$request);
-		//log::add('alexatodolist_node', 'debug', '---->getName:'.$this->getEqLogic()->getCmd(null, 'volumeinfo')->execCmd());
-		if ((isset($_options['slider'])) && ($_options['slider'] == "")) $_options['slider'] = $default;
-		if ((isset($_options['select'])) && ($_options['select'] == "")) $_options['select'] = $default;
-		if ((isset($_options['message'])) && ($_options['message'] == "")) $_options['message'] = $default;
-		if (!(isset($_options['slider']))) $_options['slider'] = "";
-		if (!(isset($_options['select']))) $_options['select'] = "";
-		if (!(isset($_options['message']))) $_options['message'] = "";
-		if (!(isset($_options['volume']))) $_options['volume'] = "";
-		//log::add('alexatodolist_node', 'info', 'xxxxxxxxxxxxx---->_options:'.json_encode($_options));
-		// Si on est sur une commande qui utilise volume, on va remettre après execution le volume courant
-		if (strstr($request, '&volume=')) $request = $request . '&lastvolume=' . $lastvolume;
-		$request = str_replace(
-			array('#slider#', '#select#', '#message#', '#volume#'),
-			array($_options['slider'], $_options['select'], urlencode(self::decodeTexteAleatoire($_options['message'])), $_options['volume']),
-			$request
-		);
-		//log::add('alexatodolist_node', 'info', '---->RequestFinale:'.$request);
-		return $request;
-	}
-
-	//private function trouveVolumeDevice() {
-	//	$logical_id = $this->getEqLogic()->getCmd(null, 'volumeinfo')->getValue();
-	//	$alexatodolist=alexatodolist::byLogicalId($logical_id, 'alexatodolist');getValue
-	//}
-
-
-	public static function decodeTexteAleatoire($_text)
-	{
-		$return = $_text;
-		if (strpos($_text, '|') !== false && strpos($_text, '[') !== false && strpos($_text, ']') !== false) {
-			$replies = interactDef::generateTextVariant($_text);
-			$random = rand(0, count($replies) - 1);
-			$return = $replies[$random];
-		}
-		preg_match_all('/{\((.*?)\) \?(.*?):(.*?)}/', $return, $matches, PREG_SET_ORDER, 0);
-		$replace = array();
-		if (is_array($matches) && count($matches) > 0) {
-			foreach ($matches as $match) {
-				if (count($match) != 4) {
-					continue;
-				}
-				$replace[$match[0]] = (jeedom::evaluateExpression($match[1])) ? trim($match[2]) : trim($match[3]);
-			}
-		}
-		return str_replace(array_keys($replace), $replace, $return);
-	}
-
-
-	private function build_ControleWhenTextRecurring($defaultWhen, $defaultText, $_options = array())
-	{
-		$request = escapeshellcmd($this->getConfiguration('request'));
-		//log::add('alexatodolist', 'debug', '----build_ControledeSliderSelectMessage RequestFinale:'.$request);
-		//log::add('alexatodolist', 'debug', '----build_ControledeSliderSelectMessage _optionsAVANT:'.json_encode($_options));
-		if ((!isset($_options['sound'])) && (!isset($_options['message'])) && (!isset($_options['when']))) {
-			if (isset($_options['select'])) { // On est dans le cas d'un son d'alarme envoyé depuis le widget
-				$_options['sound'] = urlencode($_options['select']);
-				$_options['select'] = "";
-			}
-		}
-		if ($_options['when'] == "") $_options['when'] = $defaultWhen;
-		if ($_options['message'] == "") $_options['message'] = $defaultText;
-		if ($_options['sound'] == "") $_options['sound'] = 'system_alerts_melodic_01';
-		$request = str_replace(array('#when#', '#message#', '#recurring#', '#sound#'), array(urlencode($_options['when']), urlencode($_options['message']), urlencode($_options['select']), $_options['sound']), $request);
-		return $request;
-	}
-
-	private function build_ControlePosition($_options = array())
-	{
-		$request = escapeshellcmd($this->getConfiguration('request'));
-		$request = str_replace('#position#', urlencode($_options['position']), $request);
-		return $request;
-	}
-
-	private function build_ControleRien($_options = array())
-	{
-		return escapeshellcmd($this->getConfiguration('request')) . "?truc=vide";
-	}
-
-	private function buildDeleteAllAlarmsRequest($_options = array())
-	{
-		$request = $this->getConfiguration('request');
-		log::add('alexatodolist', 'debug', '----buildDeleteAllAlarmsRequest RequestFinale:' . $request);
-		if ($_options['type'] == "") $_options['type'] = "alarm";
-		if ($_options['status'] == "") $_options['status'] = "ON";
-		return str_replace(array('#type#', '#status#'), array($_options['type'], $_options['status']), $request);
-	}
-
-	private function builddeleteReminderRequest($_options = array())
-	{
-		$request = $this->getConfiguration('request');
-		if ($_options['id'] == "") $_options['id'] = "ManqueID";
-		if ($_options['status'] == "") $_options['status'] = "ON";
-		return str_replace(array('#id#', '#status#'), array($_options['id'], $_options['status']), $request);
-	}
-
-	private function buildRestartRequest($_options = array())
-	{
-		log::add('alexatodolist_debug', 'debug', '------buildRestartRequest---UTILISE QUAND ???--A simplifier--------------------------------------');
-		$request = $this->getConfiguration('request') . "?truc=vide";
-		return str_replace('#volume#', $_options['slider'], $request);
-	}
 }

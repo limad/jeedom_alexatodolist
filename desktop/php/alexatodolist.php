@@ -2,57 +2,33 @@
 if (!isConnect('admin')) {
 	throw new Exception('{{401 - Accès non autorisé}}');
 }
-
-// Obtenir l'identifiant du plugin
+$plugName ='Alexa - Todo List';
 $plugin = plugin::byId('alexatodolist');
-// Charger le javascript
-sendVarToJS('eqType', $plugin->getId());
+if(!file_exists( __DIR__ . '/../../../../plugins/alexaapiv2/core/api/alexa_Api.php')){
+	log::add('alexatodolist', 'error', "Le plugin Alexa-Premium est introuvable, Il est indispensable au fonctionnement de 'alexatodolist'");
+	throw new Exception(__("Le plugin Alexa-Premium est introuvable, Il est indispensable au fonctionnement de 'alexatodolist'", __FILE__));
+}
 
-// Accéder aux données du plugin
+
+
+sendVarToJS('eqType', $plugin->getId());
 $eqLogics = eqLogic::byType('alexatodolist');
-$eqLogics = eqLogic::byLogicalId('list', 'alexatodolist', true);
 $logicalIdToHumanReadable = array();
 foreach ($eqLogics as $eqLogic) {
-	$logicalIdToHumanReadable[$eqLogic->getLogicalId()] = $eqLogic->getHumanName(true, false);
+	$logicalIdToHumanReadable[$eqLogic->getLogicalId()] = $eqLogic->getName();//$eqLogic->getHumanName(true, false);
 }
+sendVarToJS('logicalIdToHumanReadable', $logicalIdToHumanReadable);
+
 ?>
 
-<script>
-	var logicalIdToHumanReadable = <?php echo json_encode($logicalIdToHumanReadable); ?>
 
-	function printEqLogic(data) {
-		var str = data.logicalId
-		document.getElementById('img_device').src = "/plugins/alexaapiv2/core/config/devices/" + data.configuration.type + ".png";
-		$('#multiroom-members').empty();
-		if (data.configuration.members === undefined) {
-			$('#multiroom-members').parent().hide(); //ajouté
-			return;
-		}
-		if (data.configuration.members.length === 0) {
-			$('#multiroom-members').parent().hide();
-			return;
-		}
-		var html = '<ul style="list-style-type: none;">';
-		for (var i in data.configuration.members) {
-			var logicalId = data.configuration.members[i] + "_player";
-			if (logicalId in logicalIdToHumanReadable)
-				html += '<li style="margin-top: 5px;">' + logicalIdToHumanReadable[logicalId] + '</li>';
-			else
-				html += '<li style="margin-top: 5px;"><span class="label label-default" style="text-shadow : none;"><i>(Non configuré)</i></span> ' + logicalId + '</li>';
-		}
-		html += '</ul>';
-		$('#multiroom-members').parent().show();
-		$('#multiroom-members').append(html);
-	}
-</script>
-
-<!-- Container global (Ligne bootstrap) -->
 <div class="row row-overflow">
 	<!-- Container des listes de commandes / éléments -->
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
 		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
 		<div class="eqLogicThumbnailContainer">
-			<!-- Bouton d accès à la configuration -->
+			
+  		<!-- Bouton d accès à la configuration -->
 			<a href="index.php?v=d&amp;m=alexaapiv2&amp;p=alexaapiv2">
 				<div class="cursor eqLogicAction logoSecondary">
 					<img style="margin-top: -14px;width: 40px !important;" src="plugins/alexaapiv2/plugin_info/alexaapiv2_icon.png">
@@ -61,27 +37,41 @@ foreach ($eqLogics as $eqLogic) {
 				</div>
 			</a>
 
-			<div class="cursor eqLogicAction logoSecondary">
-				<a id="bt_addList"><i class="fas fa-plus-circle logoPrimary" style="margin-bottom: 20px;font-size: 38px;"></i>
-					<br />
-					<span style="color:#96c927">{{Ajouter une liste}}</span></a>
-			</div>
 			<!-- Bouton d accès à la configuration -->
 			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf">
 				<i class="fas fa-wrench"></i>
 				<br />
 				<span>{{Configuration}}</span>
 			</div>
+  			
+  			<!-- Bouton de scan des lists -->
+			<div class="cursor logoPrimary" id="bt_scanlists">
+				<i class="fas fa-bullseye" style="font-size: 3em;color: #00caff;"></i>
+				<br />
+				<span style="color: #00caff;">{{Scan}}</span>
+			</div>
+
+			  			
+  			<!-- Bouton Ajouter une liste -->
+			<div class="cursor eqLogicAction logoSecondary">
+				<a id="bt_addList"><i class="fas fa-plus-circle logoPrimary" style="margin-bottom: 20px;font-size: 38px;"></i>
+					<br />
+					<span style="color:#96c927">{{Ajouter une liste}}</span></a>
+			</div>
+			  			
+			<!-- Bouton removeAll -->
+			<div class="cursor eqLogicAction logoDefault" data-action="removeAll" id="bt_removeAll">
+				<i class="fas fa-minus-circle" style="color: #FA5858;"></i>
+				<br/><span>{{Supprimer tout}}</span>
+			</div>
+  
+  			<!-- Bouton Documentation -->
 			<div class="cursor eqLogicAction logoSecondary">
 				<a target="_blank" href="https://youdom.net/alexa-premium-todolist-documentation/" alt="Documentation" title="Documentation"><i class="fas fa-book-open" style="margin-bottom: 20px;font-size: 38px;"></i>
 					<br>
 					<span>{{Documentation}}</span></a>
 			</div>
-			<div class="cursor eqLogicAction logoSecondary">
-				<a target="_blank" href="https://youdom.net/" alt="Site Youdom" title="Site Youdom"><i class="fas fa-home" style="color:#8cc63f;margin-bottom: 20px;font-size: 38px;"></i>
-					<br>
-					<span>{{Site internet Youdom}}</span></a>
-			</div>
+			<!-- Bouton Communauté -->
 			<div class="cursor eqLogicAction logoSecondary">
 				<a target="_blank" href="https://www.facebook.com/groups/entraidejeedom/" alt="Communauté d'entraide Jeedom" title="Communauté d'entraide Jeedom"><i class="fas fa-users" style="color:#3b5998;margin-bottom: 20px;font-size: 38px;"></i>
 					<br>
@@ -104,20 +94,27 @@ foreach ($eqLogics as $eqLogic) {
 			<div class="panel-body">
 				<div style="position: relative;" class="eqLogicThumbnailContainer second">
 					<?php
+  					$arch_eqLogic = [];
 					$index = 0;
 					foreach ($eqLogics as $eqLogic) {
-						if (!$eqLogic->getConfiguration('archived')) {
+                      	//log::add('alexatodolist', 'debug', " desktop/alexatodolist ".$eqLogic->getName());
+		
+						if (!$eqLogic->getConfiguration('archivedList')) {
 							$datetimecreation = new DateTime($eqLogic->getConfiguration('createtime'));
 							$datetimeaujourdhui = new DateTime(date('Y-m-d'));
 							$interval = $datetimecreation->diff($datetimeaujourdhui);
 							$opacity = ($eqLogic->getIsEnable()) ? '' : ' disableCard';
 							echo '<div class="eqLogicDisplayCard cursor second ' . $opacity . '" data-eqLogic_id="' . $eqLogic->getId() . '" style="height:168px;" onclick="document.location.href=\'/index.php?v=d&p=alexatodolist&m=alexatodolist&id=' . $eqLogic->getId() . '\'" >';
-							echo '<img class="lazy" src="plugins/alexaapiv2/core/config/devices/' . $eqLogic->getConfiguration('type') . '.png" style="min-height:75px !important;width:100px !important;padding-top: 0px;" />';
+                          	$alternateImg = $eqLogic->getConfiguration('icon', '');
+							if ($alternateImg != '') echo '<img class="lazy" src="plugins/alexaapiv2/core/config/devices/' . $alternateImg . '" style=" !important;" />';
+							else echo '<img class="lazy" src="' . $plugin->getPathImgIcon() . '" style=" !important;" />';
+                          	
 							echo '<br />';
 							echo '<span class="name">' . $eqLogic->getHumanName(true, true) . '</span>';
 							echo '</div>';
 							$index++;
 						}
+                      	else $arch_eqLogic[] = $eqLogic;
 					}
 					if ($index == 0) {
 						echo '<div style="margin-bottom: 40px;margin-top: 40px;width:100%;">' . __('Aucune liste...', __FILE__) . '</div>';
@@ -128,28 +125,32 @@ foreach ($eqLogics as $eqLogic) {
 		</div>
 
 		<legend><i class="fas fa-table"></i> {{Mes listes archivées}}</legend>
-		<!-- Container de la liste -->
+		<!-- Container listes archivées -->
 		<div class="panel">
 			<div class="panel-body">
 				<div style="position: relative;" class="eqLogicThumbnailContainer second">
 					<?php
 					$index = 0;
-					foreach ($eqLogics as $eqLogic) {
-						if ($eqLogic->getConfiguration('archived')) {
-							$datetimecreation = new DateTime($eqLogic->getConfiguration('createtime'));
-							$datetimeaujourdhui = new DateTime(date('Y-m-d'));
-							$interval = $datetimecreation->diff($datetimeaujourdhui);
-							$opacity = ($eqLogic->getIsEnable()) ? '' : ' disableCard';
-							echo '<div class="eqLogicDisplayCard cursor second ' . $opacity . '" data-eqLogic_id="' . $eqLogic->getId() . '" style="height:168px;" onclick="document.location.href=\'/index.php?v=d&p=alexatodolist&m=alexatodolist&id=' . $eqLogic->getId() . '\'" >';
-							echo '<img class="lazy" src="plugins/alexaapiv2/core/config/devices/' . $eqLogic->getConfiguration('type') . '.png" style="min-height:75px !important;width:100px !important;padding-top: 0px;" />';
-							echo '<br />';
-							echo '<span class="name">' . $eqLogic->getHumanName(true, true) . '</span>';
-							echo '</div>';
-							$index++;
-						}
+					/*
+                    foreach ($arch_eqLogic as $eqLogic) {
+						if ($eqLogic->getConfiguration('archivedList')) {
+						}	
+						$datetimecreation = new DateTime($eqLogic->getConfiguration('createtime'));
+						$datetimeaujourdhui = new DateTime(date('Y-m-d'));
+						$interval = $datetimecreation->diff($datetimeaujourdhui);
+						$opacity = ($eqLogic->getIsEnable()) ? '' : ' disableCard';
+						echo '<div class="eqLogicDisplayCard cursor second ' . $opacity . '" data-eqLogic_id="' . $eqLogic->getId() . '" style="height:168px;" onclick="document.location.href=\'/index.php?v=d&p=alexatodolist&m=alexatodolist&id=' . $eqLogic->getId() . '\'" >';
+						echo '<img class="lazy" src="plugins/alexaapiv2/core/config/devices/' . $eqLogic->getConfiguration('type') . '.png" style="min-height:75px !important;width:100px !important;padding-top: 0px;" />';
+						echo '<br />';
+						echo '<span class="name">' . $eqLogic->getHumanName(true, true) . '</span>';
+						echo '</div>';
+						$index++;
+						
 					}
+					*/
 					if ($index == 0) {
-						echo '<div style="margin-bottom: 40px;margin-top: 40px;width:100%;">' . __('Aucune liste archivée...', __FILE__) . '</div>';
+						echo '<div style="margin-bottom: 40px;margin-top: 40px;width:100%;">' 
+                          	. __("Aucune liste archivée...Vous devez les activer depuis l'application Mobile", __FILE__) . '</div>';
 					}
 					?>
 				</div>
@@ -160,17 +161,21 @@ foreach ($eqLogics as $eqLogic) {
 	</div>
 	<!-- Container du panneau de contrôle -->
 	<div class="col-lg-12 eqLogic" style="display: none;">
-
-		<!-- Bouton sauvegarder -->
-		<a style="display:none" class="btn btn-success eqLogicAction pull-right" data-action="save"><i class="fas fa-check-circle"></i> {{Sauvegarder}}</a>
-		<!-- Bouton Supprimer -->
-		<a style="display:none" class="btn btn-danger eqLogicAction pull-right" data-action="remove"><i class="fas fa-minus-circle"></i> {{Supprimer}}</a>
+		<div class="input-group pull-right" style="display:inline-flex">
+				<span class="input-group-btn">
+					<a class="btn btn-info btn-sm roundedLeft" id="bt_eqConfigRaw" style="min-width: 25px;margin-left: 2px;"><i class="fas fa-info"> </i></a>
+					<a class="btn btn-sm btn-success" id="bt_oldView" title="Mode edition des commandes"><i class="icon far fa-edit"></i> </a>
+					<a class="btn btn-sm btn-default eqLogicAction" data-action="configure"><i class="fas fa-cogs"></i><span class="hidden-xs"> {{Configuration avancée}}</span></a>
+					<a class="btn btn-sm btn-success eqLogicAction" data-action="save"><i class="fas fa-check-circle"></i> {{Sauvegarder}}</a>
+					<a class="btn btn-sm btn-danger eqLogicAction roundedRight" data-action="remove"><i class="fas fa-minus-circle"></i> {{Supprimer}}</a>
+					
+                 </span>
+		</div>
+                      
 		<!-- Bouton configuration par défaut -->
-		<a style="display:none" id="bt_forcerDefaultCmd" class="btn btn-warning pull-right"><i class="fas fa-search"></i> {{Recharger configuration par défaut}}</a>
-		<!-- Bouton configuration avancée -->
-		<a class="btn btn-default eqLogicAction pull-right" data-action="configure"><i class="fas fa-cogs"></i> {{Configuration avancée}}</a>
-		<!-- Bouton documentation -->
-		<a class="btn btn-success pull-right" target="_blank" href="https://youdom.net/alexa-premium-todolist-documentation/"><i class="fas fas fa-book-open"></i> {{Documentation}}</a>
+		
+		             
+                      
 		<!-- Liste des onglets -->
 		<ul class="nav nav-tabs" role="tablist">
 			<!-- Bouton de retour -->
@@ -185,14 +190,14 @@ foreach ($eqLogics as $eqLogic) {
 		<!-- Container du contenu des onglets -->
 		<div class="tab-content" style="height:calc(100% - 50px);overflow:auto;overflow-x: hidden;">
 			<div role="tabpanel" class="tab-pane active" id="eqlogictab">
-				<br />
+				<br /><br />
 				<div class="row">
 					<div class="col-sm-7">
 						<form class="form-horizontal">
 							<fieldset>
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Nom de l'équipement Jeedom}}</label>
-									<div class="col-sm-8">
+									<div class="col-sm-6">
 										<input type="text" class="eqLogicAttr form-control" data-l1key="name" placeholder="{{Nom de l'équipement}}" />
 									</div>
 								</div>
@@ -201,7 +206,8 @@ foreach ($eqLogics as $eqLogic) {
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Objet parent}}</label>
 									<div class="col-sm-6">
-										<input type="text" class="eqLogicAttr form-control" data-l1key="id" style="display : none;" />
+										<span class="eqLogicAttr" data-l1key="id" style="display: none;"></span>
+										<span class="eqLogicAttr" data-l1key="configuration" data-l2key="icon" style="display: none;"></span>
 										<select class="eqLogicAttr form-control" data-l1key="object_id">
 											<option value="">{{Aucun}}</option>
 											<?php
@@ -214,7 +220,7 @@ foreach ($eqLogics as $eqLogic) {
 								<!-- Catégorie" -->
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Catégorie}}</label>
-									<div class="col-sm-8">
+									<div class="col-sm-6">
 										<?php
 										foreach (jeedom::getConfiguration('eqLogic:category') as $key => $value) {
 											echo '<label class="checkbox-inline">';
@@ -227,7 +233,7 @@ foreach ($eqLogics as $eqLogic) {
 								<!-- Onglet "Active Visible" -->
 								<div class="form-group">
 									<label class="col-sm-4 control-label"></label>
-									<div class="col-sm-8">
+									<div class="col-sm-6">
 										<label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="isEnable" checked />{{Activer}}</label>
 										<label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="isVisible" checked />{{Visible}}</label>
 									</div>
@@ -244,7 +250,7 @@ foreach ($eqLogics as $eqLogic) {
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{ID List}}</label>
 									<div class="col-sm-8">
-										<span style="position:relative;top:+5px;left:+5px;" class="eqLogicAttr" data-l1key="configuration" data-l2key="itemId"></span>
+										<span style="position:relative;top:+5px;left:+5px;" class="eqLogicAttr" data-l1key="configuration" data-l2key="listId"></span>
 									</div>
 								</div>
 								<div class="form-group">
@@ -264,27 +270,72 @@ foreach ($eqLogics as $eqLogic) {
 					</div>
 				</div>
 			</div>
+                                          
+                                          
+				<!-- Panel commandes  -->
+				<div role="tabpanel" class="tab-pane" id="commandtab">
 
-			<div role="tabpanel" class="tab-pane" id="commandtab">
 
+					<legend style="/*background: var(--el-defaultColor) !important*/; font-weight: 500; font-size: 1.4em;">
+						<center class="title_cmdtable">{{Commandes }}<?php echo ' - ' . $plugName . ' : '; ?>
+							<span class="eqName"></span>
+						</center>
+					</legend>
+					<br>
 
-				<table id="table_cmd" class="table table-bordered table-condensed">
-					<thead>
-						<tr>
-							<th class="col-lg-1">#</th>
-							<th class="col-lg-3" style="padding-left: calc(2em + 21px);">{{Nom}}</th>
-							<th class="col-lg-1">{{Type}}</th>
-							<th class="col-lg-4">{{Commande & Variable}}</th>
-							<th class="col-lg-2">{{Valeur}}</th>
-							<th class="col-lg-1">{{Paramètres}}</th>
-						</tr>
-					</thead>
-					<tbody>
-					</tbody>
-				</table>
+					<div id="cmdtab" style="display:none">                  
+					<table id="table_cmd" class="table table-bordered table-condensed ">
+								<th class="hidden-xs" style="min-width:50px;width:70px;">ID</th>
+								<th style="min-width:300px;width:320px;">{{Nom}}</th>
+								<th style="width: 140px;">Type</th>
+								<th>{{Etat}}</th>
+								<th style="min-width:300px;width:300px;">{{Options}}</th>
+								<th style="min-width:100px;width:150px;">{{Actions}}</th>
+						<tbody></tbody>
+					</table>
+                    </div> 
+                                      
+                    <div id="cmditab">                  
+					<legend  id="leg_cmdi"><i class="fas fa-list-alt"></i> {{Commandes Infos}}</legend>
+					<table id="table_cmdi" class="table table-bordered table-condensed ">
+						<thead>
+							<tr>
+								<th style="width: 80px;">Id</th>
+								<th style="width: 360px;">Nom</th>
+								<th style="width: 140px;">Type</th>
+								<th style="">Etat</th>
+								<th style="width: 200px;">Options</th>
+								<th style="width: 80px;">Action</th>
 
+							</tr>
+						</thead>
+
+						<tbody></tbody>
+					</table>
+					</div>
+                    <!--  commandes en mode edition -->                  
+					<div id="cmdatab">                  
+                        <legend id="leg_cmda"><i class="fas fa-list-alt"></i> {{Commandes Actions}}</legend>
+
+                        <table id="table_cmda" class="table table-bordered table-condensed">
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">Id</th>
+                                    <th style="width: 360px;">Nom</th>
+                                    <th style="width: 140px;">Type</th>
+                                    <th style="">Etat</th>
+                                    <th style="width: 200px;">Options</th>
+                                    <th style="width: 130px;">Action</th>
+
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+					</div>
+					
 
 			</div>
+            <!-- END Panel commandes  -->                              
 			<div role="tabpanel" class="tab-pane" id="listtab">
 				<div style="width:100%;text-align:center;font-size:20px;margin-top:40px;margin-bottom:20px; ">
 					<?php
@@ -303,8 +354,9 @@ foreach ($eqLogics as $eqLogic) {
 							<th>{{Editer}}</th>
 							<th>{{Ajouté le}}</th>
 							<th>{{Modifié le}}</th>
-							<th>{{Par}}</th>
-							<th>{{Statut}}</th>
+							<th>{{Utilisateur}}</th>
+							<th>{{Version}}</th>
+							<th>{{Accompli}}</th>
 							<th>{{Action}}</th>
 						</tr>
 					</thead>
@@ -313,17 +365,36 @@ foreach ($eqLogics as $eqLogic) {
 						if (isset($_GET['id']) && is_numeric($_GET['id'])) {
 							$nbr = 1;
 							foreach ($listItems as $item) {
-								if (is_array($item->getDisplay('parameters'))) {
+                              	
+								if (is_array($item->getConfiguration('parameters',''))) {
+                                  	$parameters = $item->getConfiguration('parameters');
 									echo "<tr>";
 									echo "<td>" . $nbr . "</td>";
 									echo '<td id="name' . $item->getId() . '">' . $item->getName() . '</td>';
-									echo '<td><a class="btn btn-default btn-sm cmdAction" onclick="modifierItem(this)" title="{{Modifier le nom de l\'élément}} : ' . $item->getId() . '" data-idItem="' . $item->getDisplay('parameters')['id'] . '" data-idCmd="' . $item->getId() . '" data-idList="' . $item->getDisplay('parameters')['idList'] . '" data-version="' . $item->getDisplay('parameters')['version'] . '"><i class="fas fa-cog"></i></a></td>';
-									echo "<td>" . date('d/m/Y H:i', ($item->getDisplay('parameters')['createdDateTime'] / 1000)) . "</td>";
-									echo "<td>" . date('d/m/Y H:i', ($item->getDisplay('parameters')['updatedDateTime'] / 1000)) . "</td>";
-									echo "<td title='" . $item->getDisplay('parameters')['customerId'] . "'>" . alexaapiv2::searchUser($item->getDisplay('parameters')['customerId']) . "</td>";
-									echo '<td><input id="completed' . $item->getId() . '" onclick="modifierItemCompleted(this)" type="checkbox" class="" data-l1key="configuration" data-l2key="completed" data-idItem="' . $item->getDisplay('parameters')['id'] . '" data-idCmd="' . $item->getId() . '" data-idList="' . $item->getDisplay('parameters')['idList'] . '" data-version="' . $item->getDisplay('parameters')['version'] . '" ' . ($item->getDisplay('parameters')['completed'] == '1' ? 'checked="checked"' : '') . '></td>';
-									echo "<td>";
-									echo '<a class="btn btn-danger btn-sm cmdAction" onclick="supprimerItem(this)" data-idItem="' . $item->getDisplay('parameters')['id'] . '" data-idCmd="' . $item->getId() . '" data-idList="' . $item->getDisplay('parameters')['idList'] . '" data-version="' . $item->getDisplay('parameters')['version'] . '"><i class="fas fa-minus-circle"></i> {{Supprimer}}</a>';
+									echo '<td><a class="btn btn-default btn-sm cmdAction" id="set_itemName" title="{{Modifier le nom de l\'élément}} : ' . $item->getId() . '" data-itemId="' . $parameters['id'] . '" data-idCmd="' . $item->getId() . '" data-listId="' . $parameters['listId'] . '" data-version="' . $parameters['version'] . '"><i class="fas fa-cog"></i></a></td>';
+									echo "<td>" . date('d/m/Y H:i', intval($parameters['createdDateTime'] / 1000)) . "</td>";
+									echo "<td>" . date('d/m/Y H:i', intval($parameters['updatedDateTime'] / 1000)) . "</td>";
+									echo "<td title='" . $parameters['customerId'] . "'>" . alexaapiv2::searchUser($parameters['customerId']) . "</td>";
+									echo "<td title='" . $parameters['version'] . "'>" . $parameters['version'] . "</td>";
+									echo '<td><input class="" type="checkbox" id="updateItem" data-l1key="configuration" data-l2key="completed' 
+                                      . '" data-itemId="' . $parameters['id']  
+                                      . '" data-idCmd="' . $item->getId() 
+                                      . '" data-listId="' . $parameters['listId'] 
+                                      . '" data-version="' . $parameters['version'] 
+                                      . '" data-customerId="'. $parameters['customerId']
+                                      . '" data-itemName="' . $item->getName() .'" ' 
+                                      . ($parameters['completed'] == '1' ? 'checked="checked"' : '') 
+                                      . '></td>';
+									
+                                  	echo "<td>";
+									echo '<a class="btn btn-danger btn-sm cmdAction" id="deleteItem" '
+                                      . '" data-itemId="' . $parameters['id'] 
+                                      . '" data-idCmd="' . $item->getId() 
+                                      . '" data-listId="' . $parameters['listId'] 
+                                      . '" data-itemName="' .$item->getName()
+                                      . '" data-version="' .$parameters['version'] 
+                                      . '" data-customerId="'. $parameters['customerId']
+                                      . '"><i class="fas fa-minus-circle"></i> {{Supprimer}}</a>';
 									echo "</td>";
 									echo "</tr>";
 									$nbr++;
@@ -336,7 +407,10 @@ foreach ($eqLogics as $eqLogic) {
 
 				<?php
 				if (isset($_GET['id']) && is_numeric($_GET['id'])) {
-					echo '<a class="btn btn-success btn-sm cmdAction pull-right" onclick="ajoutItem(this)"  data-idList="' . $eqLogicList->getConfiguration('itemId') . '" ><i class="fa fa-plus-circle"></i> Ajouter un élément</a>';
+					echo '<a class="btn btn-success btn-sm cmdAction pull-right" id="bt_additem" data-listId="' 
+                      . $eqLogicList->getConfiguration('listId') 
+                      . '" data-customerId="'. $eqLogicList->getConfiguration('customerId')
+                      . '" ><i class="fa fa-plus-circle"></i> Ajouter un élément à la liste</a>';
 				}
 				?>
 			</div>
@@ -348,255 +422,25 @@ foreach ($eqLogics as $eqLogic) {
 		</div>
 	</div>
 </div>
-
+<script>
+	
+	
+   	/*
+    <?php
+    	if (isset($_GET['id']) && is_numeric($_GET['id'])) {
+        	$cmd = $eqLogicList->getCmd(null, 'date_maj');
+        	if (is_object($cmd)) {
+    			?>
+                jeedom.cmd.update[<?php echo $cmd->getId(); ?>] = function(_options) {
+                	setTimeout(() => {location.reload()}, 1000);
+                }
+                <?php
+        	}
+    	}
+    ?>
+    */
+      
+</script>
 <?php include_file('desktop', 'alexatodolist', 'js', 'alexatodolist'); ?>
 <?php include_file('desktop', 'alexatodolist', 'css', 'alexatodolist'); ?>
 <?php include_file('core', 'plugin.template', 'js'); ?>
-<script>
-	document.querySelector('#bt_addList')?.addEventListener("click", function(event) {
-		jeeDialog.dialog({
-			id: 'modaladdList',
-			title: '{{Ajouter une liste}}',
-			contentUrl: 'index.php?v=d&plugin=alexaapiv2&modal=addList'
-		});
-	});
-
-
-	jeedomUtils.initTableSorter();
-
-	function addList(item) {
-		jeeDialog.prompt({
-				title: "{{Ajouter une liste}}",
-				message: '{{Nom}}',
-				inputType: 'input',
-				placeholder: '{{Renseignez un nom...}}',
-				value: '',
-				pattern: '^(")',
-				callback: function(result, event) {
-					if (result == null || result == '') {
-						if (event == 'confirm') jeedomUtils.showAlert({
-							message: "{{Le nom de la liste ne peut pas être vide...}}",
-							level: 'warning'
-						})
-					} else {
-						domUtils.ajax({
-							type: 'POST',
-							url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
-							async: false,
-							global: false,
-							data: {
-								action: "addList",
-								text: result
-							},
-							dataType: 'json',
-							error: function(request, status, error) {
-								console.log('erreur desktop/php/alexatodolist.php');
-
-								//handleAjaxError(request, status, error);
-							},
-							success: function(data) {
-								console.log(data.result);
-								location.reload();
-								//document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML=result;
-								//jeeDialog.get('#formAddReminder').destroy()
-								//document.querySelector('.refreshAction[data-action=refresh]').click();
-							}
-						});
-					}
-				},
-			},
-			function(result) {
-				if (result !== null) {
-					var name = result
-					console.log('resultat: ' + name)
-				}
-			});
-	}
-
-	function ajoutItem(item) {
-		jeeDialog.prompt({
-				title: "{{Ajouter l'élément}}",
-				message: '{{Nom}}',
-				inputType: 'input',
-				placeholder: '{{Renseignez un nom...}}',
-				value: '',
-				pattern: '^(")',
-				callback: function(result, event) {
-					if (result == null || result == '') {
-						if (event == 'confirm') jeedomUtils.showAlert({
-							message: "{{Le nom de l'élément ne peut pas être vide...}}",
-							level: 'warning'
-						})
-					} else {
-						domUtils.ajax({
-							type: 'POST',
-							url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
-							async: false,
-							global: false,
-							data: {
-								action: "addItem",
-								idList: $(item)[0].getAttribute('data-idList'),
-								text: result
-							},
-							dataType: 'json',
-							error: function(request, status, error) {
-								console.warn('erreur ajoutItem() desktop/php/alexatodolist.php');
-
-								//handleAjaxError(request, status, error);
-							},
-							success: function(data) {
-								console.log(data.result);
-								//document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML=result;
-								//jeeDialog.get('#formAddReminder').destroy()
-								//document.querySelector('.refreshAction[data-action=refresh]').click();
-							}
-						});
-					}
-				},
-			},
-			function(result) {
-				if (result !== null) {
-					var name = result
-					console.log('resultat: ' + name)
-				}
-			});
-	}
-
-	function modifierItemCompleted(item) {
-		domUtils.ajax({
-			type: 'POST',
-			url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
-			async: false,
-			global: false,
-			data: {
-				action: "modifyItemCompleted",
-				idList: $(item)[0].getAttribute('data-idList'),
-				idItem: $(item)[0].getAttribute('data-idItem'),
-				idCmd: $(item)[0].getAttribute('data-idCmd'),
-				completed: document.querySelector('#completed' + $(item)[0].getAttribute('data-idCmd')).checked,
-				text: document.querySelector('#name' + $(item)[0].getAttribute('data-idCmd')).innerHTML,
-				version: Number($(item)[0].getAttribute('data-version'))
-			},
-			dataType: 'json',
-			error: function(request, status, error) {
-				console.warn('erreur modifierItemCompleted() desktop/php/alexatodolist.php');
-
-				//handleAjaxError(request, status, error);
-			},
-			success: function(data) {
-				console.log(data.result);
-				//document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML=result;
-				//jeeDialog.get('#formAddReminder').destroy()
-				//document.querySelector('.refreshAction[data-action=refresh]').click();
-			}
-		});
-	}
-
-	function modifierItem(item) {
-		jeeDialog.prompt({
-				title: "{{Modifier l'élément}}",
-				message: '{{Nouveau nom}}', //@required
-				/*width: String,
-				height: String,
-				top: String,*/
-				inputType: 'input', //Default: input'. 'input', 'date', 'time', 'select', 'textarea'
-				/*inputOptions: [ //Options for inputType: 'select'
-						{text: String, value: String},
-				],*/
-				placeholder: '{{Renseignez un nom...}}',
-				value: document.querySelector('#name' + $(item)[0].getAttribute('data-idCmd')).innerHTML, //Default value for inputType
-				pattern: '^(")', //Validation pattern. Default pattern if inputType 'time' : '[0-9]{4}-[0-9]{2}-[0-9]{2}'
-				/*backdrop: Boolan, //Default: true
-				buttons: {},*/
-				callback: function(result, event) { //@required
-					if (result == null || result == '') {
-						if (event == 'confirm') jeedomUtils.showAlert({
-							message: "{{Le nom de l'élément ne peut pas être vide...}}",
-							level: 'warning'
-						})
-					} else {
-						domUtils.ajax({
-							type: 'POST',
-							url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
-							async: false,
-							global: false,
-							data: {
-								action: "modifyItem",
-								idList: $(item)[0].getAttribute('data-idList'),
-								idItem: $(item)[0].getAttribute('data-idItem'),
-								idCmd: $(item)[0].getAttribute('data-idCmd'),
-								completed: document.querySelector('#completed' + $(item)[0].getAttribute('data-idCmd')).checked,
-								text: result,
-								version: Number($(item)[0].getAttribute('data-version'))
-							},
-							dataType: 'json',
-							error: function(request, status, error) {
-								console.warn('erreur modifierItem() desktop/php/alexatodolist.php');
-
-
-
-								//handleAjaxError(request, status, error);
-							},
-							success: function(data) {
-								console.log(data.result);
-								document.querySelector('#name' + $(item)[0].getAttribute('data-idCmd')).innerHTML = result;
-								//jeeDialog.get('#formAddReminder').destroy()
-								//document.querySelector('.refreshAction[data-action=refresh]').click();
-							}
-						});
-					}
-				},
-			},
-			function(result) {
-				if (result !== null) {
-					var name = result
-					console.log('resultat: ' + name)
-				}
-			});
-	}
-
-	function supprimerItem(item) {
-		jeeDialog.confirm("{{Êtes-vous sûr de vouloir supprimer l'élément ?}}", function(result) {
-			if (result) {
-				//Do stuff
-				domUtils.ajax({
-					type: 'POST',
-					url: 'plugins/alexaapiv2/core/ajax/alexaapiv2.ajax.php',
-					async: false,
-					global: false,
-					data: {
-						action: "deleteItem",
-						idList: $(item)[0].getAttribute('data-idList'),
-						idItem: $(item)[0].getAttribute('data-idItem'),
-						idCmd: $(item)[0].getAttribute('data-idCmd')
-					},
-					dataType: 'json',
-					error: function(request, status, error) {
-						console.log('erreur desktop/php/alexatodolist.php');
-
-						//handleAjaxError(request, status, error);
-					},
-					success: function(data) {
-						console.log(data.result);
-						//document.querySelector('#name'+$(item)[0].getAttribute('data-idEqlogic')).innerHTML=result;
-						//jeeDialog.get('#formAddReminder').destroy()
-						//document.querySelector('.refreshAction[data-action=refresh]').click();
-					}
-				});
-			}
-		});
-	}
-</script>
-
-<?php
-if (isset($_GET['id']) && is_numeric($_GET['id'])) {
-	$cmd = $eqLogicList->getCmd(null, 'date_maj');
-	if (is_object($cmd)) {
-?>
-		jeedom.cmd.update[<?php echo $cmd->getId(); ?>] = function(_options) {
-		setTimeout(() => {location.reload()}, 1000);
-		}
-<?php
-	}
-}
-?>
