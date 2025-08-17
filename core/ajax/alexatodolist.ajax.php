@@ -38,7 +38,7 @@ try {
               ajax::error($return);
             }
 			break;
-      	case 'updateItem':
+      	case 'set_completed':
 			log::add('alexatodolist', 'debug', "alexatodolist::Ajax::$action "
 					. " listId: ".init('listId')
 					. " itemId: ".init('itemId')
@@ -50,7 +50,7 @@ try {
 					
             );
         	
-        	$return = alexatodolist::updateItem(init('listId'), init('itemId'), init('itemName'), init('customerId'), init('version'), init('completed'));
+        	$return = alexatodolist::set_completed( init('listId'), init('itemId'), init('completed'), init('version') );
 			if($return === true) ajax::success($return);
         	else{
               log::add('alexatodolist', 'warning', "alexatodolist::Ajax::$action => $return");

@@ -376,7 +376,7 @@ sendVarToJS('logicalIdToHumanReadable', $logicalIdToHumanReadable);
 									echo "<td>" . date('d/m/Y H:i', intval($parameters['updatedDateTime'] / 1000)) . "</td>";
 									echo "<td title='" . $parameters['customerId'] . "'>" . alexaapiv2::searchUser($parameters['customerId']) . "</td>";
 									echo "<td title='" . $parameters['version'] . "'>" . $parameters['version'] . "</td>";
-									echo '<td><input class="" type="checkbox" id="updateItem" data-l1key="configuration" data-l2key="completed' 
+									echo '<td><input class="" type="checkbox" id="set_completed" data-l1key="configuration" data-l2key="completed' 
                                       . '" data-itemId="' . $parameters['id']  
                                       . '" data-idCmd="' . $item->getId() 
                                       . '" data-listId="' . $parameters['listId'] 

@@ -227,7 +227,7 @@
 			});
 	});	
 	
-	document.querySelectorAll("#updateItem").forEach(el => {
+	document.querySelectorAll("#set_completed").forEach(el => {
       	el.addEventListener("click", function(event) {
             let listId = this.getAttribute('data-listId'),
             	itemId = this.getAttribute('data-itemId'),
@@ -243,7 +243,7 @@
                 async: false,
                 global: false,
                 data: {
-                    action: "updateItem",
+                    action: "set_completed",
                     listId: listId,
                     itemId: itemId,
                     idCmd: idCmd,
@@ -254,7 +254,7 @@
                 },
                 dataType: 'json',
                 error: function(request, status, error) {
-                    console.warn('erreur updateItem() desktop/js/alexatodolist.js');
+                    console.warn('erreur set_completed() desktop/js/alexatodolist.js');
 
                     //handleAjaxError(request, status, error);
                 },
@@ -267,7 +267,7 @@
                         return;
                     }
                     setTimeout(() => {location.reload()}, 3000);
-                    console.log('updateItem: ' + data.result);
+                    console.log('set_completed: ' + data.result);
                 }
             });
         });

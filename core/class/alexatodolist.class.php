@@ -1,4 +1,5 @@
 <?php
+  
 require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
 if(!file_exists( __DIR__ . '/../../../../plugins/alexaapiv2/core/api/alexa_Api.php')){
 	log::add('alexatodolist', 'error', 'Le plugin Alexa-Premium est introuvable');
@@ -12,17 +13,18 @@ class alexatodolist extends eqLogic
 {
 
 // ####################################################################################			
+public static $_widgetPossibility = array('custom' => true, 'custom::layout' => true);
+
 // ####################################################################################			
-	public static $_widgetPossibility = array('custom' => true, 'custom::layout' => true);
-	
-// ####################################################################################			
+// ####################################################################################		
+
 	public static function removeAllEqLogics ($scan = true)
 	{
 		event::add('jeedom::alert', array('level' => 'success', 'page' => __CLASS__, 'message' => __('Suppression en cours ...', __FILE__)));
 		foreach (alexaapiv2::byType(__CLASS__, false) as $eqLogic) {
 			$eqLogic->remove();
 		}
-
+		return true;
 		//if ($scan !== false) self::scanAllAlexa();
 	}
 	
@@ -31,12 +33,14 @@ class alexatodolist extends eqLogic
 	{
 		//log::add('alexatodolist', 'debug', '---------------------------------------------CRON------------------------');
 	} 
-	// ####################################################################################			
+
+// ####################################################################################			
 	public function refresh($_eqlogic_id = null)
 	{
 		log::add('alexatodolist', 'debug', __FUNCTION__ . " start... $_eqlogic_id");
       	self::scanlists($_eqlogic_id);
 	}
+  
 // ####################################################################################			
 	public static function scanlists($listId=null)
 	{
@@ -133,17 +137,18 @@ class alexatodolist extends eqLogic
         $eqName = $this->getName();
       	log::add('alexatodolist', 'debug', '    '.__FUNCTION__ . " [$eqName] itemsList " . json_encode($listItems));
         $listId = $this->getLogicalId();
+      	$eqId = $this->getId();
         $listItemPresent = [];
       	$items_listAr = [];
       	$items_Completed = [];
         $itemsUnCompleted = [];
         foreach ($listItems as $listItem) {
         	$itemId = $listItem['id'] ?? null;
-          	$itemName = $listItem['value'] ?? $itemId;
-        	if(!$itemId || $itemId == '') {
+          	if(!$itemId || $itemId == '') {
               	log::add('alexatodolist', 'warning', __FUNCTION__ . " [$eqName] No itemId $itemId");
             	continue;
             }
+        	$itemName = $listItem['value'];
         	$items_listAr[] = $itemId.'|'.$itemName;
         	
           	$isCompleted = ($listItem['completed']) ? 'true' : 'false';
@@ -162,19 +167,29 @@ class alexatodolist extends eqLogic
           	$cmdi = $this->getCmd('info', $itemId);
 			if(!is_object($cmdi)){
                 $cmdi = new alexatodolistCmd();
+                $cmdDoublon = cmd::byEqLogicIdCmdName($this->getId(), $itemName);
+              	if(is_object($cmdDoublon)){
+                  	$itemName .= '::Doublon_'. explode('-',$itemId)[0];
+                }
+              	else log::add('alexatodolist', 'warning', '    '.__FUNCTION__ . " [$eqName][$listId] items $itemName ");
                 $cmdi->setName($itemName);
-                $cmdi->setType('info');
+              	$cmdi->setType('info');
                 $cmdi->setSubType('string');
                 $cmdi->setEqType('alexatodolist');
                 $cmdi->setEqLogic_id($this->getId());
                 $cmdi->setIsHistorized(0);
                 $cmdi->setIsVisible(0);
                 $cmdi->setConfiguration('itemId', $itemId);
+                $cmdi->setConfiguration('listId', $listId);
                 $cmdi->setConfiguration('type', 'item');
                 $cmdi->setLogicalId($itemId);
             }
         	else {
-				$cmdi->setName($itemName);
+				$cmdDoublon = cmd::byEqLogicIdCmdName($this->getId(), $itemName);
+              	if(is_object($cmdDoublon)){
+                  	$itemName .= '::Doublon_'. explode('-',$itemId)[0];
+                }
+              	$cmdi->setName($itemName);
 				$cmdi->setLogicalId($itemId);
 				$cmdi->setIsVisible(0);
               	$cmdi->setConfiguration('type', 'item');
@@ -220,17 +235,15 @@ class alexatodolist extends eqLogic
             $cmd_completed_off->save();
         } 
     }
-	
 
 // ####################################################################################			
 	public function afficheToutesCommandes($Position)
 	{
-		log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " start");
+		log::add('alexatodolist', 'debug', ' ' . __FUNCTION__ . " start");
 		foreach ($this->getCmd('action') as $cmd) {
-			log::add('alexatodolist', 'info', $Position . '--cmd:' . $cmd->getLogicalId() . "/" . $cmd->getName());
+			log::add('alexatodolist', 'debug', $Position . '--cmd:' . $cmd->getLogicalId() . "/" . $cmd->getName());
 		}
 	}
-
 
 // ####################################################################################			
 	public static function deleteItem($listId, $itemId, $version)
@@ -256,14 +269,16 @@ class alexatodolist extends eqLogic
           	return $msg;
         }
       	return true;
-	}// ####################################################################################			
+	}
+
+// ####################################################################################			
 	public static function addItem ($listId, $itemName)
 	{
 		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($listId, $itemName)");
 		$result = alexa_Api::addItem($listId, $itemName);
     	if(isset($result['itemInfoList'][0]['itemName']) && $result['itemInfoList'][0]['itemName'] == $itemName){
           	self::scanlists($listId);
-          	return true;
+          	return $result['itemInfoList'][0]['itemId'];//true;
         }else{
           	$code = $result['code'] ?? '';
           	$errorMessage = ($result['body']['errorType'] ?? ''). ' => '.($result['body']['errorMessage'] ?? '');
@@ -301,7 +316,7 @@ class alexatodolist extends eqLogic
         }
     }
 
-  // ####################################################################################			
+// ####################################################################################			
 	public static function modifyItem($listId, $itemId, $idCmd, $completed, $text, $version)
 	{
 		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ($listId, $itemId, $idCmd, $completed, $text, $version)");
@@ -355,6 +370,37 @@ class alexatodolist extends eqLogic
         }
 		
 	}
+  
+// ####################################################################################			
+	public static function set_completed ($listId, $itemId, $itemStatus, $version)
+	{
+		$eqlogic = alexatodolist::byLogicalId($listId, __CLASS__);
+      	log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start ");
+      	
+		if(!$version){
+        	$cmdItem = $eqlogic->getCmd(null, $itemId);
+      		$version = $cmdItem->getConfiguration('parameters', [])['version'] ?? null;
+        }
+        if($itemStatus === 'true' || $itemStatus === true || $itemStatus === 1) $itemStatus = 'COMPLETE'; 
+        elseif($itemStatus === 'false' || $itemStatus === false || $itemStatus === 0) $itemStatus = 'ACTIVE'; 
+      
+      	log::add('alexatodolist', 'debug',  __CLASS__ . '::' . __FUNCTION__ ." ($listId, $itemId, $itemStatus, $version)");
+      
+		$command = alexa_Api::set_itemComplete($listId, $itemId, $itemStatus, $version);
+      	
+        $commandStatus = $command['itemInfo']['itemStatus'] ?? null;
+        if($commandStatus == $itemStatus) {
+        	log::add('alexatodolist', 'debug',  __CLASS__ . '::' . __FUNCTION__ ." Success => ".json_encode($command));
+        	$eqlogic->refresh($listId);
+        	return true;
+        }
+        else log::add('alexatodolist', 'warning', __CLASS__ . '::' . __FUNCTION__ ." result => ".json_encode($command));
+      
+      
+      
+		
+	}
+  
 // ####################################################################################			
 	public function callApi($function, $data=array())
 	{
@@ -376,7 +422,7 @@ class alexatodolist extends eqLogic
 	public function postSave()
 	{
 		$eqName = $this->getName();
-      	//log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " [$eqName] start");
+      	//log::add('alexatodolist', 'debug', ' ' . __FUNCTION__ . " [$eqName] start");
 		if($this->getConfiguration('cmdsMaked', false) != true){
           	$this->makeCmds();
         }
@@ -386,12 +432,12 @@ class alexatodolist extends eqLogic
 	public function makeCmds()
 	{
       	$eqName = $this->getName();
-      	log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " [$eqName] start");
+      	log::add('alexatodolist', 'debug', ' ' . __FUNCTION__ . " [$eqName] start");
 		$createCount = 0;
       	$updateCount = 0;
       	$cmd = $this->getCmd(null, 'refresh');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande Refresh");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande Refresh");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('refresh');
 			$cmd->setIsVisible(1);
@@ -407,7 +453,7 @@ class alexatodolist extends eqLogic
       
 		$cmd = $this->getCmd(null, 'items_list');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande itemsList");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande itemsList");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('items_list');
 			$cmd->setIsVisible(0);
@@ -417,47 +463,51 @@ class alexatodolist extends eqLogic
 			$cmd->setType('info');
 			$cmd->setSubType('string');
 			$cmd->setEqLogic_id($this->getId());
-			$cmd->save();
+			$cmd->setTemplate('dashboard', "customtemp::iso_liste");
+        	$cmd->save();
 		  	$createCount++;
-		}
+		}else $updateCount++;
       
 		$cmd = $this->getCmd(null, 'date_maj');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande date_maj");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande date_maj");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('date_maj');
 			$cmd->setIsVisible(1);
-			$cmd->setOrder("2");
+			$cmd->setOrder("3");
 			$cmd->setDisplay('icon', '<i class="fas fa-clock"></i>');
 			$cmd->setName(__('Date mise à jour', __FILE__));
 			$cmd->setType('info');
 			$cmd->setSubType('string');
 			$cmd->setEqLogic_id($this->getId());
-			$cmd->save();
+			$cmd->setTemplate('dashboard', "customtemp::iso_line");
+        	$cmd->save();
 		  	$createCount++;
-		}
+		}else $updateCount++;
       
+      	   	
 		$cmd = $this->getCmd(null, 'addItem');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande addItem");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande addItem");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('addItem');
 			$cmd->setIsVisible(1);
-			$cmd->setOrder("3");
+			$cmd->setOrder("4");
 			$cmd->setName(__('AddItem', __FILE__));
 			$cmd->setType('action');
 			$cmd->setSubType('message');
-          	$cmd->setConfiguration('listValue', '');
+          	$cmd->setEqLogic_id($this->getId());
+			$cmd->setConfiguration('listValue', '');
           	$cmd->setConfiguration('request', 'addItem?itemName=#title#');
 			$cmd->setDisplay('message_disable', 1);
            	$cmd->setDisplay('title_placeholder', "Nom de l'élément");
-           	$cmd->setEqLogic_id($this->getId());
-			$cmd->save();
-		}
+           	$cmd->setTemplate('dashboard', "customtemp::iso_message");
+        	$cmd->save();
+		}else $updateCount++;
       
 		$cmd = $this->getCmd(null, 'deleteItem');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande deleteItem");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande deleteItem");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('deleteItem');
 			$cmd->setIsVisible(1);
@@ -468,75 +518,80 @@ class alexatodolist extends eqLogic
 			$cmd->setConfiguration('request', 'deleteItem?itemId=#itemId#');
 			$cmd->setEqLogic_id($this->getId());
           	$cmd->setConfiguration('listValue', '');
-          	$cmd->save();
+          	$cmd->setTemplate('dashboard', "customtemp::iso_select");
+        	$cmd->save();
 		  	$createCount++;
 		}else $updateCount++;
       	
         $cmd = $this->getCmd(null, 'updateItem');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande updateItem");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande updateItem");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('updateItem');
 			$cmd->setIsVisible(0);
-			$cmd->setOrder("4");
+			$cmd->setOrder("6");
 			$cmd->setName(__('updateItem', __FILE__));
 			$cmd->setType('action');
 			$cmd->setSubType('other');
 			$cmd->setConfiguration('request', 'updateItem?itemId=#itemId#&completed=#completed#&text=#text#');
 			$cmd->setEqLogic_id($this->getId());
-			$cmd->save();
+			$cmd->setTemplate('dashboard', "customtemp::iso_btn");
+        	$cmd->save();
 		  	$createCount++;
-		}
+		}else $updateCount++;
       
 		$cmd = $this->getCmd(null, 'completed_on');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande completed_on");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande completed_on");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('completed_on');
 			$cmd->setIsVisible(1);
-			$cmd->setOrder("5");
+			$cmd->setOrder("7");
 			$cmd->setName(__('Elément accompli', __FILE__));
 			$cmd->setType('action');
 			$cmd->setSubType('select');
 			$cmd->setConfiguration('request', 'updateItem?itemId=#select#&completed=true');
 			$cmd->setEqLogic_id($this->getId());
           	$cmd->setConfiguration('listValue', '');
-          	$cmd->save();
+          	$cmd->setTemplate('dashboard', "customtemp::iso_switch");
+        	$cmd->save();
 		  	$createCount++;
 		}else $updateCount++;
       
       	$cmd = $this->getCmd(null, 'completed_off');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande completed_off");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande completed_off");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('completed_off');
 			$cmd->setIsVisible(1);
-			$cmd->setOrder("5");
+			$cmd->setOrder("8");
 			$cmd->setName(__('Elément Non accompli', __FILE__));
 			$cmd->setType('action');
 			$cmd->setSubType('select');
 			$cmd->setConfiguration('request', 'modifyItem?itemId=#select#&completed=false');
 			$cmd->setEqLogic_id($this->getId());
           	$cmd->setConfiguration('listValue', '');
-          	$cmd->save();
+          	$cmd->setTemplate('dashboard', "customtemp::iso_switch");
+        	$cmd->save();
 		  	$createCount++;
 		}else $updateCount++;
       
       	$cmd = $this->getCmd(null, 'setArchived');
 		if (!is_object($cmd)) {
-			log::add('alexatodolist', 'info',  __FUNCTION__ ." [$eqName] ajout commande updateItem");
+			log::add('alexatodolist', 'debug',  __FUNCTION__ ." [$eqName] ajout commande updateItem");
 			$cmd = new alexatodolistCmd();
 			$cmd->setLogicalId('setArchived');
 			$cmd->setIsVisible(1);
-			$cmd->setOrder("4");
+			$cmd->setOrder("9");
 			$cmd->setName(__('Archiver', __FILE__));
 			$cmd->setType('action');
 			$cmd->setSubType('other');
 			$cmd->setConfiguration('request', 'setArchived?itemId=#itemId#&completed=#completed#&text=#text#');
 			$cmd->setEqLogic_id($this->getId());
-			$cmd->save();
+			$cmd->setTemplate('dashboard', "customtemp::iso_btn");
+        	$cmd->save();
 		  	$createCount++;
-		}
+		}else $updateCount++;
       
       	$this->setStatus('forceUpdate', false); //dans tous les cas, on repasse forceUpdate à false
 		if($updateCount>0 || $createCount>0){
@@ -622,7 +677,7 @@ class alexatodolistCmd extends cmd
         $listId = $eqLogic->getConfiguration('listId');
       	$cmdLogId = $this->getLogicalId();
 
-		log::add('alexatodolist', 'info', ' ' . __FUNCTION__ . " [$eqName] $cmdLogId start ");
+		log::add('alexatodolist', 'debug', ' ' . __FUNCTION__ . " [$eqName] $cmdLogId start ");
 		switch ($cmdLogId) {
 			case 'refresh':
 				$eqLogic->refresh($eqLogicId);
@@ -650,18 +705,8 @@ class alexatodolistCmd extends cmd
             	break;
 			case 'completed_off':
             	$itemId = $_options['select'];
-            	$cmdItem = $eqLogic->getCmd(null, $itemId);
-            	$version = $cmdItem->getConfiguration('parameters', [])['version'] ?? null;
-            	log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId -> ($listId, $itemsId, 'ACTIVE')");
-				$command = $eqLogic->callApi('set_itemComplete', array($listId, $itemsId, 'ACTIVE', $version));
-				$commandStatus = $command['itemInfo']['itemStatus'] ?? null;
-            	if($commandStatus=="ACTIVE") {
-					log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId Success => ".json_encode($command));
-                  	$eqLogic->refresh($listId);
-                  	return true;
-                }
-				else log::add('alexatodolist', 'warning',  __FUNCTION__ ." $cmdLogId  result => ".json_encode($command));
-				break;
+            	$command = alexatodolist::set_completed_off($listId, $_options['select'], 'ACTIVE');
+            	break;
 			case 'completed_on':
 				$itemId = $_options['select'];
             	log::add('alexatodolist', 'debug',  __FUNCTION__ ." $cmdLogId -> ($listId, $itemsId, 'COMPLETE')");
@@ -713,6 +758,7 @@ class alexatodolistCmd extends cmd
 			return;
 		}
 	}
+
 	private function buildRequest($_options = array())
 	{
 		log::add('alexatodolist', 'debug', __CLASS__ . '::' . __FUNCTION__ . " start " . json_encode($_options));
